@@ -1,0 +1,33 @@
+# Stickman Studio — Python Dependencies
+# Install with: pip install -r requirements.txt
+# See setup_windows.bat for complete setup including FFmpeg
+
+# ── Core UI ──────────────────────────────────────────────────────────────────
+PySide6>=6.6.0                    # Desktop GUI (Qt 6)
+
+# ── Image Processing ─────────────────────────────────────────────────────────
+Pillow>=10.0.0                    # Image rendering for animation frames
+
+# ── HTTP Client ──────────────────────────────────────────────────────────────
+requests>=2.31.0                  # Ollama REST API calls
+
+# ── Numerical Computing ──────────────────────────────────────────────────────
+numpy>=1.24.0                     # Audio synthesis, signal processing
+
+# ── Progress Reporting ───────────────────────────────────────────────────────
+tqdm>=4.65.0                      # CLI progress bars for setup/batch ops
+
+# ── TTS Engines (install at least one) ───────────────────────────────────────
+# kokoro-onnx>=0.3.0              # Kokoro-82M TTS (run: pip install kokoro-onnx)
+# piper-tts>=1.2.0                # Piper TTS (run: pip install piper-tts)
+
+# ── Audio Processing ─────────────────────────────────────────────────────────
+# soundfile>=0.12.0               # Read/write audio (optional, for TTS output)
+# sounddevice>=0.4.6              # Voice preview playback (optional)
+
+# ── Notes ────────────────────────────────────────────────────────────────────
+# External tools (not Python packages) also required:
+#   - FFmpeg: downloaded by setup_windows.bat
+#   - Ollama: downloaded by setup_windows.bat
+# See README.md for full installation instructions.
+

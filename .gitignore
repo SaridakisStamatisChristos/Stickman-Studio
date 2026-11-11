@@ -1,0 +1,86 @@
+# ==============================================================================
+# Stickman Studio - .gitignore
+# Created by Atharv Hatwar
+# ==============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.dylib
+*.dll
+
+# Caches and temporary runtime directories
+cache/
+temp/
+scratch/
+output/
+projects/
+models/
+ffmpeg/
+
+# Log files
+*.log
+logs/
+*.out
+
+# Python virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Packaging / Distribution
+dist/
+build/
+*.egg-info/
+*.egg
+
+# IDEs and Text Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Operating System specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.Spotlight-V100
+.Trashes
+
+# Agent & AI workspace internal metadata
+.agents/
+skills-lock.json
+.gemini/
+brain/
+.system_generated/
+
+# Large model weights (keep repository lightweight)
+*.bin
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.ckpt
+
+# User generated media files
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wav
+*.mp3
+
+# Exception: allow documentation and showcase preview images
+!docs/images/*
+!assets/previews/*
+
