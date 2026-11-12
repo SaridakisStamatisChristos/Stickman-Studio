@@ -173,9 +173,127 @@ PHYSICAL_METAPHORS: dict[str, dict[str, Any]] = {
         "action": "CROSS_ARMS",
         "emotion": "NEUTRAL",
         "objects": [
-            {"asset": "SHIELD", "x": 0.58, "y": 0.36, "width": 0.22, "height": 0.26},
+            {"asset": "SHIELD", "x": 0.58, "y": 0.36, "width": 0.24, "height": 0.30},
+            {"asset": "CHECK", "x": 0.80, "y": 0.22, "width": 0.12, "height": 0.12},
         ],
         "effects": ["WARM"],
+    },
+    # Advanced Psychological & Storytelling Metaphors (Engineered by Atharv Hatwar)
+    "THE_MARTYR_TRAP": {
+        "keywords": ("martyr", "loudest sacrifice", "sacrifice in the room", "trap", "guilt", "hold the room hostage", "whiny", "servant in this house", "broken back", "attention seeker"),
+        "background": "HOME",
+        "camera": "CLOSE",
+        "action": "HEADACHE_STRESS",
+        "emotion": "SAD",
+        "objects": [
+            {"asset": "BROKEN_CROWN", "x": 0.52, "y": 0.20, "width": 0.22, "height": 0.18},
+            {"asset": "PUPPET_STRINGS", "x": 0.24, "y": 0.28, "width": 0.28, "height": 0.36},
+        ],
+        "effects": ["VIGNETTE"],
+    },
+    "THE_TETHER_HOOK": {
+        "keywords": ("doesn't want you", "move on", "tether", "leash", "hook", "tied", "leaving", "hold you back", "cant leave", "never lets you completely leave", "restrained"),
+        "background": "ABSTRACT",
+        "camera": "MEDIUM",
+        "action": "STRUGGLE",
+        "emotion": "CONFUSED",
+        "objects": [
+            {"asset": "TETHER_THREAD", "x": 0.44, "y": 0.45, "width": 0.38, "height": 0.16},
+            {"asset": "DOORWAY_SUNLIGHT", "x": 0.14, "y": 0.32, "width": 0.26, "height": 0.48},
+        ],
+        "effects": ["VIGNETTE"],
+    },
+    "THE_CHASM_DISTANCE": {
+        "keywords": ("distance", "rarely texts", "creates distance", "unanswered", "seen 3 days ago", "chasm", "emotional distance", "gap", "one-sided", "make time for you"),
+        "background": "ABSTRACT",
+        "camera": "WIDE",
+        "action": "REACH",
+        "emotion": "SAD",
+        "objects": [
+            {"asset": "CHASM_CRACK", "x": 0.42, "y": 0.40, "width": 0.22, "height": 0.50},
+            {"asset": "PHONE", "x": 0.22, "y": 0.32, "width": 0.16, "height": 0.22},
+        ],
+        "effects": ["COOL"],
+    },
+    "THE_BREADCRUMBS": {
+        "keywords": ("breadcrumbs", "replies to your stories", "how have you been", "little things", "jealous", "occasional attention", "crumbs", "replies to stories", "story reply"),
+        "background": "ABSTRACT",
+        "camera": "MEDIUM",
+        "action": "SURPRISED",
+        "emotion": "SURPRISED",
+        "objects": [
+            {"asset": "NOTIFICATION_POPUP", "x": 0.52, "y": 0.22, "width": 0.36, "height": 0.32},
+            {"asset": "BREADCRUMB_TRAIL", "x": 0.32, "y": 0.65, "width": 0.40, "height": 0.12},
+        ],
+        "effects": ["WARM", "SPARKLE"],
+    },
+    "THE_MOUSETRAP": {
+        "keywords": ("psychological trap", "trap", "bait", "mousetrap", "mistake attention", "genuine interest", "occasional attention for genuine interest", "lure"),
+        "background": "ABSTRACT",
+        "camera": "MEDIUM",
+        "action": "KNEEL",
+        "emotion": "CONFUSED",
+        "objects": [
+            {"asset": "MOUSETRAP", "x": 0.52, "y": 0.48, "width": 0.42, "height": 0.30},
+        ],
+        "effects": ["VIGNETTE", "CAMERA_SHAKE"],
+    },
+    "THE_GLASS_JAR_SHELF": {
+        "keywords": ("access to someone", "jar", "shelf", "display item", "keep you on shelf", "on call", "backup plan", "trophy", "difference between wanting someone", "wanting access"),
+        "background": "ROOM",
+        "camera": "MEDIUM",
+        "action": "SIT",
+        "emotion": "SAD",
+        "objects": [
+            {"asset": "GLASS_JAR_PRISON", "x": 0.32, "y": 0.32, "width": 0.36, "height": 0.44},
+        ],
+        "effects": ["COOL"],
+    },
+    "THE_TIME_DRAIN": {
+        "keywords": ("months wasted", "decoding", "unclear intentions", "intentions clear", "spending months", "waste your time", "calendar", "wasting months"),
+        "background": "ABSTRACT",
+        "camera": "MEDIUM",
+        "action": "HEADACHE_STRESS",
+        "emotion": "SAD",
+        "objects": [
+            {"asset": "HOURGLASS", "x": 0.50, "y": 0.36, "width": 0.28, "height": 0.38},
+            {"asset": "CLOCK", "x": 0.22, "y": 0.22, "width": 0.14, "height": 0.14},
+        ],
+        "effects": ["VIGNETTE"],
+    },
+    "SOMEONE_DOESNT_HATE_YOU": {
+        "keywords": ("hate you to waste your time", "waste your time", "politeness", "crushing time", "polite", "friendly wave", "dont have to hate you"),
+        "background": "STAGE",
+        "camera": "CLOSE",
+        "action": "WAVE",
+        "emotion": "HAPPY",
+        "objects": [
+            {"asset": "GIANT_CLOCK", "x": 0.48, "y": 0.42, "width": 0.38, "height": 0.38},
+        ],
+        "effects": ["WARM"],
+    },
+    "THE_HAMSTER_WHEEL_BAIT": {
+        "keywords": ("enough hope", "stop you from leaving", "prevent you from leaving", "leaving the treadmill", "keep giving you enough hope", "prevent you from leaving", "treadmill", "bait on a stick", "dangling"),
+        "background": "ABSTRACT",
+        "camera": "MEDIUM",
+        "action": "RUN",
+        "emotion": "CONFUSED",
+        "objects": [
+            {"asset": "HAMSTER_WHEEL", "x": 0.44, "y": 0.40, "width": 0.42, "height": 0.42},
+            {"asset": "HEART", "x": 0.72, "y": 0.36, "width": 0.12, "height": 0.12},
+        ],
+        "effects": ["VIGNETTE"],
+    },
+    "SNIPPED_THREAD_BREAKOUT": {
+        "keywords": ("difficult to lose", "genuinely wanted", "breakout", "cut the cord", "cut the thread", "snip", "freedom", "walk away", "step off", "dont confuse", "punchline", "sunrise"),
+        "background": "ABSTRACT",
+        "camera": "WIDE",
+        "action": "WALK_RIGHT",
+        "emotion": "HAPPY",
+        "objects": [
+            {"asset": "SNIPPED_THREAD_SUNRISE", "x": 0.48, "y": 0.35, "width": 0.44, "height": 0.45},
+        ],
+        "effects": ["WARM", "SPARKLE"],
     },
     "SPEED_ACCELERATION": {
         "keywords": ("sprint", "accelerate", "move fast", "speed", "velocity", "take action", "momentum", "launch quickly", "execution", "speed wins"),
@@ -426,14 +544,23 @@ class ProceduralSceneEngine:
         # Extract speech/thought bubble ONLY when the narration explicitly contains quotes!
         speech, thought = self._extract_quoted_dialogue(narration)
 
-        if has_explicit_verb:
+        if best_metaphor_key and best_score >= 8.0:
+            meta = PHYSICAL_METAPHORS[best_metaphor_key]
+            action = meta.get("action", sem_action)
+            emotion = meta.get("emotion", sem_emotion)
+            objects = [dict(o) for o in meta.get("objects", [])]
+            effects = list(meta.get("effects", []))
+            bg = meta.get("background", sem_bg)
+            cam = meta.get("camera", self._pick_diverse_camera())
+            chosen_metaphor = best_metaphor_key
+        elif has_explicit_verb:
             action = sem_action
             emotion = sem_emotion
-            objects = sem_props
+            objects = sem_props if sem_props else ([dict(o) for o in PHYSICAL_METAPHORS[best_metaphor_key]["objects"]] if (best_metaphor_key and best_score >= 3.0) else [])
             effects = ["WARM"] if emotion in ("HAPPY", "EXCITED") else (["COOL"] if emotion in ("SAD", "ANGRY") else [])
             bg = sem_bg
             cam = "DYNAMIC_CUT" if action in ("SPRINT_FAST", "RUN", "JUMP", "FIGHT") else self._pick_diverse_camera()
-            chosen_metaphor = None
+            chosen_metaphor = best_metaphor_key if (best_metaphor_key and best_score >= 3.0 and not sem_props) else None
         elif best_metaphor_key and best_score >= 3.0:
             meta = PHYSICAL_METAPHORS[best_metaphor_key]
             action = meta.get("action", sem_action)

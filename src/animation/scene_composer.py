@@ -23,7 +23,11 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from .assets import AssetLibrary, _hex_to_rgba, _is_dark_hex, _load_ui_font
 from .stickman import POSE_SEQUENCES, StickmanRenderer
 from engine.scene_templates import normalize_scene_for_composer
-from styles.style_packs import resolve_style_pack, get_adaptive_style_for_scene
+from styles.style_packs import (
+    resolve_style_pack,
+    get_adaptive_style_for_scene,
+    synthesize_auto_style_for_scene,
+)
 
 
 _CHARACTER_PALETTE = [
@@ -89,20 +93,31 @@ class SceneComposer:
 
     def compose_scene_stream(self, scene: dict, duration: float) -> Iterator[Image.Image]:
         """Stream frames in O(1) memory with style-coherent scenery, actors & FX."""
-        # Dynamic Chameleon Adaptive: adapt style parameters per scene based on tone & action
-        if self.style == "s14_chameleon_adaptive":
+        # Dynamic Auto / Chameleon Adaptive: synthesize or select bespoke per-scene style
+        if self.style in ("auto", "s14_chameleon_adaptive"):
             narr = str(scene.get("narration", ""))
             emo = str(scene.get("emotion", ""))
             act = str(scene.get("action", ""))
             if not act and scene.get("characters"):
                 act = str(scene["characters"][0].get("action", ""))
-            scene_style_id = get_adaptive_style_for_scene(narr, emo, act)
-            scene_pack, scene_sp = resolve_style_pack(scene_style_id)
+            if self.style == "auto":
+                scene_pack, scene_sp = synthesize_auto_style_for_scene(
+                    narration=narr,
+                    emotion=emo,
+                    action=act,
+                    scene_idx=int(scene.get("id", 1)) - 1,
+                    topic=str(scene.get("topic", "")),
+                    variant=str(self.style_variant or "smart_mix"),
+                )
+            else:
+                scene_style_id = get_adaptive_style_for_scene(narr, emo, act)
+                scene_pack, scene_sp = resolve_style_pack(scene_style_id)
             if self.use_lcm:
                 scene_sp["use_lcm"] = True
             self.pack = scene_pack
             self.sp = scene_sp
             self.renderer = StickmanRenderer(scene_pack.id, variant=scene_sp.get("variant"))
+            self.renderer.params = dict(scene_sp)
             self.assets = AssetLibrary(scene_sp)
 
         scene = normalize_scene_for_composer(scene, style_id=self.pack.id)

@@ -65,6 +65,11 @@ _VALID_OBJECTS = {
     "LEVER_BOULDER", "ICEBERG", "HAMSTER_WHEEL", "JUGGLING_BALLS", "DOMINOES",
     "BRICK_WALL", "CRACKED_WALL", "BATTERY_DRAIN", "BALANCE_SCALE", "HOURGLASS",
     "PODIUM", "SHIELD", "MAGNIFYING_GLASS",
+    # Advanced Psychological & Storytelling Metaphors
+    "MOUSETRAP", "GLASS_JAR_PRISON", "TETHER_THREAD", "PUPPET_STRINGS",
+    "SIGH_SHOCKWAVES", "DOORWAY_SUNLIGHT", "NOTIFICATION_POPUP", "BREADCRUMB_TRAIL",
+    "BROKEN_CROWN", "GIANT_CLOCK", "SNIPPED_THREAD_SUNRISE", "CHASM_CRACK",
+    "EGO_TROPHY",
     # Animals & Dynamic Story Props (Atharv Hatwar)
     "DOG", "PUPPY", "CAT", "KITTEN", "BIRD", "HORSE", "FISH",
     "ROCKET", "BICYCLE", "BIKE", "TREASURE_CHEST", "TREASURE", "BRAIN",
@@ -131,6 +136,9 @@ class ScenePlanner:
     def __init__(self, llm_manager: LLMManager) -> None:
         self.llm = llm_manager
 
+    def _is_ollama_running(self) -> bool:
+        return bool(self.llm and hasattr(self.llm, "check_ollama_running") and self.llm.check_ollama_running())
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -149,7 +157,7 @@ class ScenePlanner:
             script = self.generate_script(topic=topic or "Human Behavior", duration=duration, style=pack.id)
 
         try:
-            if self.llm.check_ollama_running():
+            if self._is_ollama_running():
                 prompt = self._build_planning_prompt(script, topic, duration, pack, format)
                 response = self.llm.generate(
                     prompt,
@@ -204,7 +212,7 @@ class ScenePlanner:
         """).strip()
 
         try:
-            if self.llm.check_ollama_running():
+            if self._is_ollama_running():
                 shortened = _clean_script_text(self.llm.generate(prompt, max_tokens=512, temperature=0.35))
                 if shortened and 12 <= len(shortened.split()) <= max_words * 1.15:
                     return shortened
@@ -265,7 +273,7 @@ class ScenePlanner:
         """).strip()
 
         try:
-            if self.llm.check_ollama_running():
+            if self._is_ollama_running():
                 improved = _clean_script_text(self.llm.generate(prompt, max_tokens=1024, temperature=0.55))
                 if improved and len(improved.split()) >= 8:
                     return improved
@@ -301,7 +309,7 @@ class ScenePlanner:
         """).strip()
 
         try:
-            if self.llm.check_ollama_running():
+            if self._is_ollama_running():
                 script = _clean_script_text(self.llm.generate(prompt, max_tokens=1024, temperature=0.72))
                 if script and len(script.split()) >= 12:
                     return script

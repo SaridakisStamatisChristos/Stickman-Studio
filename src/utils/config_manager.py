@@ -29,7 +29,7 @@ class ConfigManager:
         "default_format": "9:16",
         "default_resolution": "1080p",
         "default_fps": 24,
-        "default_style": "a1_classic_bw",
+        "default_style": "auto",
         "default_style_variant": "",
         "use_hardware_encoding": True,
         # Audio settings

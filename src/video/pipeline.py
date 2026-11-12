@@ -127,7 +127,15 @@ class VideoPipeline:
         pack, _sp = resolve_style_pack(raw_style, style_variant)
         style: str = pack.id
         voice_id: str = str(params.get("voice_id", ""))
-        voice_speed: float = float(params.get("voice_speed", 1.0))
+        raw_speed = params.get("voice_speed", 1.0)
+        auto_voice_speed: bool = bool(
+            params.get("auto_voice_speed", False)
+            or (isinstance(raw_speed, str) and raw_speed.strip().lower() == "auto")
+        )
+        try:
+            voice_speed: float = 1.0 if (isinstance(raw_speed, str) and raw_speed.strip().lower() == "auto") else float(raw_speed)
+        except (TypeError, ValueError):
+            voice_speed = 1.0
         voice_pitch: float = float(params.get("voice_pitch", 0.0))
         fmt: str = str(params.get("format", "9:16"))
         resolution: str = str(params.get("resolution", "1080"))
@@ -243,6 +251,14 @@ class VideoPipeline:
             report("Generating narration", 26)
             if self._cancel_check():
                 return None
+
+            if auto_voice_speed:
+                try:
+                    from tts.tts_manager import compute_auto_voice_speed
+                    voice_speed = compute_auto_voice_speed(script, target_duration=float(target_duration))
+                    log(f"Auto Voice Speed calculated: {voice_speed:.2f}x for {target_duration}s target.")
+                except Exception:
+                    pass
 
             log("Synthesizing offline narration sentence by sentence...")
             sentence_audio, scenes = self._synthesise_narration(

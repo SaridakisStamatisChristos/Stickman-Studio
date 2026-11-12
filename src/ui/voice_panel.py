@@ -8,6 +8,7 @@ from typing import Callable, Optional
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFrame,
     QGroupBox,
@@ -34,6 +35,37 @@ GENDER_ICONS: dict[str, str] = {
 }
 
 
+_VOICE_PANEL_QSS = """
+QFrame#voiceCard {
+    background: #131A2B;
+    border: 1px solid #263248;
+    border-radius: 10px;
+}
+QFrame#voiceCard:hover {
+    background: #192238;
+    border-color: #3B4970;
+}
+QFrame#voiceCard[selected="true"] {
+    background: #1E2540;
+    border: 2px solid #8B5CF6;
+}
+QPushButton#voicePrevBtn {
+    background: #1E293B;
+    color: #38BDF8;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QPushButton#voicePrevBtn:hover {
+    background: #0D293A;
+    border-color: #38BDF8;
+    color: #FFFFFF;
+}
+"""
+
+
 class VoiceCard(QFrame):
     """Compact card representing a single voice option."""
 
@@ -46,10 +78,10 @@ class VoiceCard(QFrame):
         self._voice_data: dict = voice
         self._is_selected: bool = False
         self.setObjectName("voiceCard")
+        self.setProperty("selected", "false")
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedHeight(68)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self._apply_style(False)
 
         h = QHBoxLayout(self)
         h.setContentsMargins(10, 6, 10, 6)
@@ -60,6 +92,7 @@ class VoiceCard(QFrame):
         icon_lbl = QLabel(GENDER_ICONS.get(gender, "⚥"))
         icon_lbl.setFont(QFont("Segoe UI", 16))
         icon_lbl.setFixedWidth(28)
+        icon_lbl.setStyleSheet("background: transparent;")
         h.addWidget(icon_lbl)
 
         # Name + tags
@@ -67,6 +100,7 @@ class VoiceCard(QFrame):
         info.setSpacing(2)
         name_lbl = QLabel(voice.get("name", self._voice_id))
         name_lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        name_lbl.setStyleSheet("color: #F1F5F9; background: transparent;")
         info.addWidget(name_lbl)
 
         tags = voice.get("tags", [])
@@ -79,17 +113,14 @@ class VoiceCard(QFrame):
             tags_str = f"#{lang}  #{pers}  #{backend}"
         tag_lbl = QLabel(tags_str)
         tag_lbl.setFont(QFont("Segoe UI", 8))
-        tag_lbl.setStyleSheet("color: #4FC3F7;")
+        tag_lbl.setStyleSheet("color: #38BDF8; background: transparent;")
         info.addWidget(tag_lbl)
         h.addLayout(info, stretch=1)
 
         # Preview button
         prev_btn = QPushButton("▶ Preview")
-        prev_btn.setFixedWidth(80)
-        prev_btn.setStyleSheet(
-            "QPushButton { background: #0f3460; color: white; border-radius: 4px; padding: 4px 8px; font-size: 11px; }"
-            "QPushButton:hover { background: #1a4a8a; }"
-        )
+        prev_btn.setObjectName("voicePrevBtn")
+        prev_btn.setFixedWidth(82)
         prev_btn.clicked.connect(lambda: self.preview.emit(self._voice_id))
         h.addWidget(prev_btn)
 
@@ -99,15 +130,14 @@ class VoiceCard(QFrame):
         return self._voice_id
 
     def set_selected(self, selected: bool) -> None:
+        if self._is_selected == selected:
+            return
         self._is_selected = selected
-        self._apply_style(selected)
-
-    def _apply_style(self, selected: bool) -> None:
-        base = "QFrame#voiceCard { border-radius: 8px; "
-        if selected:
-            self.setStyleSheet(base + "background: #1a2a4a; border: 2px solid #e94560; }")
-        else:
-            self.setStyleSheet(base + "background: #16213e; border: 1px solid #0f3460; }")
+        self.setProperty("selected", "true" if selected else "false")
+        st = self.style()
+        if st:
+            st.unpolish(self)
+            st.polish(self)
 
     def mousePressEvent(self, event) -> None:  # type: ignore[override]
         if event.button() == Qt.LeftButton:
@@ -124,12 +154,14 @@ class VoicePanel(QWidget):
 
     voice_changed = Signal(str)           # voice_id
     preview_requested = Signal(str, str)  # voice_id, preview_text
+    auto_speed_changed = Signal(bool)     # auto_speed enabled
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._cards: dict[str, VoiceCard] = {}
         self._selected_voice_id: str = ""
         self._preview_callback: Optional[Callable[[str, str], None]] = None
+        self.setStyleSheet(_VOICE_PANEL_QSS)
         self._setup_ui()
 
     # ------------------------------------------------------------------
@@ -140,7 +172,7 @@ class VoicePanel(QWidget):
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(4)
-        splitter.setStyleSheet("QSplitter::handle { background: #0f3460; }")
+        splitter.setStyleSheet("QSplitter::handle { background: #1E293B; }")
 
         # ---- Left: voice list ----
         left_widget = QWidget()
@@ -216,10 +248,17 @@ class VoicePanel(QWidget):
         settings_lbl.setFont(QFont("Segoe UI", 12, QFont.Bold))
         right_layout.addWidget(settings_lbl)
 
-        # Speed
-        right_layout.addWidget(self._make_slider_group(
+        # Speed (with Auto Pacing option)
+        speed_group = self._make_slider_group(
             "Speed", "speed", 5, 20, 10, lambda v: f"{v / 10:.1f}×"
-        ))
+        )
+        self._auto_speed_chk = QCheckBox("Auto")
+        self._auto_speed_chk.setToolTip("Automatically adjust speaking speed to match your script and target video duration")
+        self._auto_speed_chk.setStyleSheet("QCheckBox { color: #58A6FF; font-size: 11px; font-weight: bold; }")
+        self._auto_speed_chk.toggled.connect(self._on_auto_speed_toggled)
+        speed_header = speed_group.layout().itemAt(0).layout()
+        speed_header.insertWidget(1, self._auto_speed_chk)
+        right_layout.addWidget(speed_group)
 
         # Pitch
         right_layout.addWidget(self._make_slider_group(
@@ -297,7 +336,19 @@ class VoicePanel(QWidget):
 
         # Store references
         setattr(self, f"_{attr_name}_slider", slider)
+        setattr(self, f"_{attr_name}_val_lbl", val_lbl)
         return group
+
+    def _on_auto_speed_toggled(self, checked: bool) -> None:
+        self._speed_slider.setEnabled(not checked)
+        if checked:
+            self._speed_val_lbl.setText("Auto")
+        else:
+            self._speed_val_lbl.setText(f"{self._speed_slider.value() / 10:.1f}×")
+        self.auto_speed_changed.emit(bool(checked))
+
+    def set_auto_speed(self, enabled: bool) -> None:
+        self._auto_speed_chk.setChecked(bool(enabled))
 
     # ------------------------------------------------------------------
     def _on_preview_clicked(self) -> None:
@@ -314,21 +365,25 @@ class VoicePanel(QWidget):
         lang_filter = self._lang_combo.currentData() if hasattr(self, "_lang_combo") else "all"
         gen_filter = self._gender_combo.currentData() if hasattr(self, "_gender_combo") else "all"
         pers_filter = self._pers_combo.currentData() if hasattr(self, "_pers_combo") else "all"
-        for vid, card in self._cards.items():
-            vd = card._voice_data
-            haystack = " ".join([
-                vid,
-                str(vd.get("name", "")),
-                str(vd.get("gender", "")),
-                str(vd.get("personality", "")),
-                str(vd.get("language", "")),
-                str(vd.get("backend", "")),
-                " ".join(vd.get("tags", [])),
-            ]).lower()
-            lang_ok = (lang_filter == "all") or (str(vd.get("language", "en")).lower() == lang_filter)
-            gen_ok = (gen_filter == "all") or (str(vd.get("gender", "")).lower() == gen_filter)
-            pers_ok = (pers_filter == "all") or (pers_filter in str(vd.get("personality", "")).lower())
-            card.setVisible((not q or q in haystack) and lang_ok and gen_ok and pers_ok)
+        self._list_container.setUpdatesEnabled(False)
+        try:
+            for vid, card in self._cards.items():
+                vd = card._voice_data
+                haystack = " ".join([
+                    vid,
+                    str(vd.get("name", "")),
+                    str(vd.get("gender", "")),
+                    str(vd.get("personality", "")),
+                    str(vd.get("language", "")),
+                    str(vd.get("backend", "")),
+                    " ".join(vd.get("tags", [])),
+                ]).lower()
+                lang_ok = (lang_filter == "all") or (str(vd.get("language", "en")).lower() == lang_filter)
+                gen_ok = (gen_filter == "all") or (str(vd.get("gender", "")).lower() == gen_filter)
+                pers_ok = (pers_filter == "all") or (pers_filter in str(vd.get("personality", "")).lower())
+                card.setVisible((not q or q in haystack) and lang_ok and gen_ok and pers_ok)
+        finally:
+            self._list_container.setUpdatesEnabled(True)
 
     # ------------------------------------------------------------------
     # Public API
@@ -336,37 +391,41 @@ class VoicePanel(QWidget):
 
     def set_voices(self, voices: list[dict]) -> None:
         """Populate the voice list from genuinely installed local voices."""
-        for card in self._cards.values():
-            self._list_layout.removeWidget(card)
-            card.deleteLater()
-        self._cards.clear()
+        self._list_container.setUpdatesEnabled(False)
+        try:
+            for card in self._cards.values():
+                self._list_layout.removeWidget(card)
+                card.deleteLater()
+            self._cards.clear()
 
-        # Refresh genuinely supported languages in dropdown across all installed models
-        if hasattr(self, "_lang_combo"):
-            self._lang_combo.blockSignals(True)
-            self._lang_combo.clear()
-            self._lang_combo.addItem("All Languages", "all")
-            langs = sorted({str(v.get("language", "en")).lower() for v in voices})
-            lang_names = {
-                "en": "English (en)",
-                "hi": "Hindi / Hinglish (hi)",
-                "es": "Spanish (es)",
-                "fr": "French (fr)",
-                "it": "Italian (it)",
-                "ja": "Japanese (ja)",
-                "pt": "Portuguese (pt)",
-                "zh": "Mandarin Chinese (zh)",
-            }
-            for lc in langs:
-                self._lang_combo.addItem(lang_names.get(lc, lc.upper()), lc)
-            self._lang_combo.blockSignals(False)
+            # Refresh genuinely supported languages in dropdown across all installed models
+            if hasattr(self, "_lang_combo"):
+                self._lang_combo.blockSignals(True)
+                self._lang_combo.clear()
+                self._lang_combo.addItem("All Languages", "all")
+                langs = sorted({str(v.get("language", "en")).lower() for v in voices})
+                lang_names = {
+                    "en": "English (en)",
+                    "hi": "Hindi / Hinglish (hi)",
+                    "es": "Spanish (es)",
+                    "fr": "French (fr)",
+                    "it": "Italian (it)",
+                    "ja": "Japanese (ja)",
+                    "pt": "Portuguese (pt)",
+                    "zh": "Mandarin Chinese (zh)",
+                }
+                for lc in langs:
+                    self._lang_combo.addItem(lang_names.get(lc, lc.upper()), lc)
+                self._lang_combo.blockSignals(False)
 
-        for voice in voices:
-            card = VoiceCard(voice)
-            card.selected.connect(self._on_voice_selected)
-            card.preview.connect(self._on_card_preview)
-            self._list_layout.addWidget(card)
-            self._cards[voice["id"]] = card
+            for voice in voices:
+                card = VoiceCard(voice)
+                card.selected.connect(self._on_voice_selected)
+                card.preview.connect(self._on_card_preview)
+                self._list_layout.addWidget(card)
+                self._cards[voice["id"]] = card
+        finally:
+            self._list_container.setUpdatesEnabled(True)
 
         if voices:
             self._on_voice_selected(voices[0]["id"])
@@ -391,10 +450,11 @@ class VoicePanel(QWidget):
         if voice_id in self._cards:
             self._on_voice_selected(voice_id)
 
-    def set_voice_settings(self, speed: float = 1.0, pitch: int = 0, volume: int = 100) -> None:
+    def set_voice_settings(self, speed: float = 1.0, pitch: int = 0, volume: int = 100, auto_speed: bool = False) -> None:
         self._speed_slider.setValue(max(5, min(20, int(round(speed * 10)))))
         self._pitch_slider.setValue(max(-5, min(5, int(pitch))))
         self._volume_slider.setValue(max(0, min(100, int(volume))))
+        self._auto_speed_chk.setChecked(bool(auto_speed))
 
     def get_selected_voice_id(self) -> str:
         return self._selected_voice_id
@@ -403,6 +463,7 @@ class VoicePanel(QWidget):
         return {
             "voice_id": self._selected_voice_id,
             "speed": self._speed_slider.value() / 10.0,
+            "auto_speed": self._auto_speed_chk.isChecked(),
             "pitch": self._pitch_slider.value(),
             "volume": self._volume_slider.value(),
         }

@@ -31,19 +31,23 @@ from PySide6.QtWidgets import (
 )
 
 PLAYER_STYLE = """
-QWidget { background: #0d1b2a; color: #e8e8e8; }
+QWidget { background: #0B0F19; color: #E2E8F0; }
 QPushButton {
-    background: #0f3460; color: white; border: none;
-    border-radius: 6px; padding: 7px 14px; font-size: 12px;
+    background: #131A2B; color: #E2E8F0; border: 1px solid #263248;
+    border-radius: 7px; padding: 7px 14px; font-size: 12px; font-weight: 500;
 }
-QPushButton:hover { background: #1a4a8a; }
-QPushButton:disabled { background: #1a1a2e; color: #444; }
-QSlider::groove:horizontal { background: #1a2a3a; height: 5px; border-radius: 3px; }
+QPushButton:hover { background: #1E293B; border-color: #38BDF8; color: #FFFFFF; }
+QPushButton:pressed { background: #0F172A; }
+QPushButton:disabled { background: #0F1420; color: #475569; border-color: #1E293B; }
+QSlider::groove:horizontal { background: #1E293B; height: 5px; border-radius: 3px; }
 QSlider::handle:horizontal {
-    background: #e94560; width: 14px; height: 14px;
-    border-radius: 7px; margin: -5px 0;
+    background: #8B5CF6; width: 14px; height: 14px;
+    border-radius: 7px; margin: -5px 0; border: 2px solid #C4B5FD;
 }
-QSlider::sub-page:horizontal { background: #e94560; height: 5px; border-radius: 3px; }
+QSlider::sub-page:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7C3AED, stop:1 #06B6D4);
+    height: 5px; border-radius: 3px;
+}
 QLabel { background: transparent; }
 """
 

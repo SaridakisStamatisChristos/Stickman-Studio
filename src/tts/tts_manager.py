@@ -725,3 +725,37 @@ $synth.Dispose()
         except Exception as exc:
             logger.error("Could not read WAV duration for '%s': %s", path, exc)
             return 0.0
+
+
+def compute_auto_voice_speed(
+    script: str,
+    target_duration: float = 30.0,
+    video_profile: str = "balanced",
+) -> float:
+    """
+    Compute optimal natural TTS speaking speed from script density, target duration,
+    and video storytelling cadence within pleasant human bounds [0.88, 1.22].
+    """
+    words = len((script or "").split())
+    if words <= 0:
+        return 1.0
+
+    profile_base = {
+        "psychology": 0.96,
+        "story_wisdom": 0.97,
+        "growth_discipline": 1.04,
+        "social_contrast": 1.03,
+    }.get(video_profile, 1.0)
+
+    sentence_stops = len(re.findall(r"[.!?]+", script))
+    comma_pauses = script.count(",") + script.count("—") + script.count(";")
+    est_base_dur = (words / 2.42) + (sentence_stops * 0.28) + (comma_pauses * 0.12)
+
+    if target_duration > 4.0:
+        ratio = est_base_dur / float(target_duration)
+        clamped_ratio = max(0.88, min(1.22, ratio))
+        blended = (0.65 * clamped_ratio) + (0.35 * profile_base)
+    else:
+        blended = profile_base
+
+    return round(max(0.88, min(1.22, blended)), 2)

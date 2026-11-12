@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QSlider,
     QSpinBox,
     QSplitter,
+    QStackedWidget,
     QStatusBar,
     QTabWidget,
     QTextEdit,
@@ -41,6 +42,7 @@ from PySide6.QtWidgets import (
 
 from engine.scene_planner import ScenePlanner
 from styles.style_packs import resolve_style_pack
+from ui.cis_mode_panel import CISModePanel
 from ui.preview_player import PreviewPlayer
 from ui.progress_dialog import ProgressDialog
 from ui.settings_dialog import SettingsDialog
@@ -52,46 +54,46 @@ logger = logging.getLogger(__name__)
 
 PREMIUM_STYLESHEET = """
 /* ── Base ── */
-QMainWindow { background: #0F1117; }
+QMainWindow { background: #0B0F19; }
 QWidget {
-    background: #0F1117;
-    color: #E6EDF3;
+    background: #0B0F19;
+    color: #E2E8F0;
     font-family: 'Segoe UI';
     font-size: 13px;
 }
 
 /* ── Cards / Frames ── */
 QFrame#card {
-    background: #1C2333;
-    border: 1px solid #30363D;
-    border-radius: 12px;
+    background: #131A2B;
+    border: 1px solid #263248;
+    border-radius: 14px;
     padding: 14px;
 }
 
 /* ── Buttons – default ── */
 QPushButton {
-    background: #21262D;
-    color: #C9D1D9;
-    border: 1px solid #30363D;
+    background: #1B2336;
+    color: #CBD5E1;
+    border: 1px solid #263248;
     border-radius: 8px;
     padding: 8px 16px;
     font-size: 13px;
 }
 QPushButton:hover {
-    background: #2D333B;
-    border-color: #58A6FF;
-    color: #E6EDF3;
+    background: #243049;
+    border-color: #38BDF8;
+    color: #F8FAFC;
 }
-QPushButton:pressed { background: #161B22; }
-QPushButton:disabled { background: #161B22; color: #484F58; border-color: #21262D; }
+QPushButton:pressed { background: #0F172A; }
+QPushButton:disabled { background: #111827; color: #475569; border-color: #1E293B; }
 
 /* ── Primary CTA ── */
 QPushButton#primary {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #7C3AED, stop:1 #6D28D9);
+        stop:0 #7C3AED, stop:1 #2563EB);
     color: white;
     border: none;
-    border-radius: 10px;
+    border-radius: 11px;
     padding: 14px 28px;
     font-size: 15px;
     font-weight: bold;
@@ -99,43 +101,43 @@ QPushButton#primary {
 }
 QPushButton#primary:hover {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #8B5CF6, stop:1 #7C3AED);
+        stop:0 #8B5CF6, stop:1 #3B82F6);
 }
 QPushButton#primary:pressed {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #6D28D9, stop:1 #5B21B6);
+        stop:0 #6D28D9, stop:1 #1D4ED8);
 }
 QPushButton#primary:disabled {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #3D2065, stop:1 #2D1B4E);
-    color: #7B72A8;
+        stop:0 #312154, stop:1 #1B2A4A);
+    color: #64748B;
 }
 
 /* ── Secondary ── */
 QPushButton#secondary {
-    background: #161B22;
+    background: #0F172A;
     border: 1px solid #06B6D4;
-    color: #06B6D4;
+    color: #22D3EE;
     font-weight: bold;
     padding: 10px 18px;
-    border-radius: 8px;
+    border-radius: 9px;
 }
 QPushButton#secondary:hover {
-    background: #0D2030;
-    border-color: #22D3EE;
-    color: #22D3EE;
+    background: #0E293B;
+    border-color: #38BDF8;
+    color: #FFFFFF;
 }
 
 /* ── Pill Toggle buttons ── */
 QPushButton#pill {
-    background: #1C2333;
-    color: #8B949E;
-    border: 1px solid #30363D;
+    background: #131A2B;
+    color: #94A3B8;
+    border: 1px solid #263248;
     border-radius: 16px;
     padding: 6px 16px;
     font-size: 12px;
 }
-QPushButton#pill:hover { background: #2D333B; color: #C9D1D9; }
+QPushButton#pill:hover { background: #1E293B; color: #E2E8F0; }
 QPushButton#pill:checked {
     background: #7C3AED;
     color: white;
@@ -145,56 +147,56 @@ QPushButton#pill:checked {
 
 /* ── Inputs ── */
 QTextEdit, QLineEdit, QSpinBox {
-    background: #0D1117;
-    border: 1px solid #30363D;
-    border-radius: 8px;
-    color: #E6EDF3;
+    background: #080C14;
+    border: 1px solid #263248;
+    border-radius: 9px;
+    color: #F1F5F9;
     padding: 10px;
     selection-background-color: #7C3AED;
 }
 QTextEdit:focus, QLineEdit:focus, QSpinBox:focus {
-    border: 1px solid #7C3AED;
-    background: #0D1117;
+    border: 1px solid #8B5CF6;
+    background: #080C14;
 }
 QSpinBox::up-button, QSpinBox::down-button {
-    background: #21262D;
+    background: #1B2336;
     border: none;
     width: 18px;
 }
 
 /* ── ComboBox ── */
 QComboBox {
-    background: #21262D;
-    border: 1px solid #30363D;
+    background: #1B2336;
+    border: 1px solid #263248;
     border-radius: 8px;
-    color: #E6EDF3;
+    color: #F1F5F9;
     padding: 7px 12px;
 }
-QComboBox:hover { border-color: #58A6FF; }
+QComboBox:hover { border-color: #38BDF8; }
 QComboBox::drop-down { border: none; width: 24px; }
 QComboBox::down-arrow { width: 10px; height: 10px; }
 QComboBox QAbstractItemView {
-    background: #161B22;
-    color: #E6EDF3;
-    border: 1px solid #30363D;
-    border-radius: 6px;
+    background: #131A2B;
+    color: #F1F5F9;
+    border: 1px solid #334155;
+    border-radius: 8px;
     selection-background-color: #7C3AED;
     outline: none;
 }
 
 /* ── Sliders ── */
 QSlider::groove:horizontal {
-    background: #21262D;
+    background: #1E293B;
     height: 5px;
     border-radius: 3px;
 }
 QSlider::handle:horizontal {
-    background: #7C3AED;
+    background: #8B5CF6;
     width: 16px;
     height: 16px;
     border-radius: 8px;
     margin: -6px 0;
-    border: 2px solid #A78BFA;
+    border: 2px solid #C4B5FD;
 }
 QSlider::sub-page:horizontal {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -205,88 +207,119 @@ QSlider::sub-page:horizontal {
 
 /* ── Labels ── */
 QLabel#header {
-    font-size: 22px;
+    font-size: 21px;
     font-weight: bold;
-    color: #E6EDF3;
+    color: #F8FAFC;
 }
 QLabel#section {
     font-size: 13px;
     font-weight: bold;
-    color: #06B6D4;
+    color: #22D3EE;
     margin-top: 6px;
 }
 
 /* ── Scroll ── */
 QScrollArea { border: none; background: transparent; }
 QScrollBar:vertical {
-    background: #0D1117;
+    background: #080C14;
     width: 8px;
     border-radius: 4px;
 }
 QScrollBar::handle:vertical {
-    background: #30363D;
+    background: #293548;
     border-radius: 4px;
-    min-height: 24px;
+    min-height: 28px;
 }
-QScrollBar::handle:vertical:hover { background: #484F58; }
+QScrollBar::handle:vertical:hover { background: #475569; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 
 /* ── Tabs ── */
 QTabWidget::pane {
-    border: 1px solid #30363D;
-    background: #161B22;
-    border-radius: 10px;
+    border: 1px solid #263248;
+    background: #0F1524;
+    border-radius: 12px;
     padding: 8px;
 }
 QTabBar::tab {
-    background: #0D1117;
-    color: #8B949E;
+    background: #080C14;
+    color: #94A3B8;
     padding: 10px 20px;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    margin-right: 3px;
+    border-top-left-radius: 9px;
+    border-top-right-radius: 9px;
+    margin-right: 4px;
     font-size: 12px;
 }
 QTabBar::tab:selected {
-    background: #1C2333;
-    color: #E6EDF3;
-    border-bottom: 2px solid #7C3AED;
+    background: #131A2B;
+    color: #F8FAFC;
+    border-bottom: 2px solid #06B6D4;
     font-weight: bold;
 }
-QTabBar::tab:hover:!selected { background: #161B22; color: #C9D1D9; }
+QTabBar::tab:hover:!selected { background: #111827; color: #E2E8F0; }
 
 /* ── GroupBox ── */
 QGroupBox {
-    border: 1px solid #30363D;
+    border: 1px solid #263248;
     border-radius: 10px;
     margin-top: 14px;
     padding-top: 10px;
-    color: #8B949E;
+    color: #94A3B8;
     font-weight: bold;
     font-size: 11px;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     left: 14px;
-    color: #8B949E;
+    color: #94A3B8;
 }
 
-/* ── Radio Button (legacy, kept for compat) ── */
-QRadioButton { color: #C9D1D9; spacing: 6px; }
-QRadioButton::indicator { width: 14px; height: 14px; border-radius: 7px; border: 2px solid #30363D; }
+/* ── Radio Button ── */
+QRadioButton { color: #CBD5E1; spacing: 6px; }
+QRadioButton::indicator { width: 14px; height: 14px; border-radius: 7px; border: 2px solid #334155; }
 QRadioButton::indicator:checked { background: #7C3AED; border-color: #7C3AED; }
 
 /* ── Status Bar ── */
 QStatusBar {
-    background: #0D1117;
-    color: #8B949E;
-    border-top: 1px solid #21262D;
+    background: #080C14;
+    color: #94A3B8;
+    border-top: 1px solid #1E293B;
     font-size: 11px;
 }
 
 /* ── Splitter ── */
-QSplitter::handle { background: #21262D; }
-QSplitter::handle:hover { background: #7C3AED; }
+QSplitter::handle { background: #1E293B; }
+QSplitter::handle:hover { background: #8B5CF6; }
+
+/* ── Mode Switcher ── */
+QFrame#modeSwitcher {
+    background: #080C14;
+    border: 1px solid #263248;
+    border-radius: 12px;
+    padding: 6px;
+}
+QPushButton#modeBtn {
+    background: transparent;
+    color: #94A3B8;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 6px;
+    font-size: 11px;
+    font-weight: bold;
+    min-width: 0px;
+}
+QPushButton#modeBtn:hover {
+    background: #1B2336;
+    color: #E2E8F0;
+}
+QPushButton#modeBtn:checked {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7C3AED, stop:1 #2563EB);
+    color: white;
+    border-color: #8B5CF6;
+}
+QPushButton#modeBtn[data-cis="true"]:checked {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #F43F5E, stop:1 #E11D48);
+    border-color: #FB7185;
+}
 """
 
 
@@ -337,6 +370,43 @@ class ScriptWorkerThread(QThread):
             self.finished_text.emit("")
 
 
+class _StatusCheckWorker(QThread):
+    """Polls system RAM/VRAM and Ollama availability off the UI thread."""
+
+    status_ready = Signal(str)
+
+    def __init__(self, llm, tts, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._llm = llm
+        self._tts = tts
+
+    def run(self) -> None:
+        try:
+            sys_info = get_system_summary()
+            avail_ram_gb = sys_info["available_ram_mb"] / 1024.0
+            total_ram_gb = sys_info["total_ram_mb"] / 1024.0
+            free_vram_mb = sys_info["free_vram_mb"]
+
+            if self._llm.check_ollama_running():
+                model = self._llm.default_model or self._llm.get_recommended_model()
+                loc = self._llm.get_model_run_location()
+                ai_status = f"🟢 Ollama  {model} ({loc})"
+            else:
+                ai_status = "🟢 In-Process AI Director (Native Offline)"
+
+            voices_cnt = len(self._tts.get_available_voices())
+            langs = ",".join(self._tts.get_supported_languages())
+            msg = (
+                f"Stickman Studio • Atharv Hatwar  |  "
+                f"RAM: {avail_ram_gb:.1f}/{total_ram_gb:.1f} GB free  |  "
+                f"VRAM free: {free_vram_mb} MB  |  {ai_status}  |  "
+                f"Voices: {voices_cnt} ({langs})"
+            )
+            self.status_ready.emit(msg)
+        except Exception as exc:
+            logger.debug("StatusCheckWorker error: %s", exc)
+
+
 class MainWindow(QMainWindow):
     """Primary desktop interface for Stickman Studio."""
 
@@ -357,6 +427,7 @@ class MainWindow(QMainWindow):
 
         self._gen_thread: Optional[GenerationThread] = None
         self._script_thread: Optional[ScriptWorkerThread] = None
+        self._status_worker: Optional[_StatusCheckWorker] = None
         self._progress_dlg: Optional[ProgressDialog] = None
         self._custom_music_path: str = ""
         self._highlight_color: str = str(self.config.get("caption_highlight_color", ""))
@@ -364,17 +435,27 @@ class MainWindow(QMainWindow):
         self._last_output_path: str = ""
         self._projects_dir = Path("projects")
         self._projects_dir.mkdir(parents=True, exist_ok=True)
+        self._cis_mode_active: bool = False
 
         self.setWindowTitle("Stickman Studio • Created by Atharv Hatwar")
         self.setMinimumSize(1100, 780)
         self.setStyleSheet(PREMIUM_STYLESHEET)
+
+        # Debounce script length recalculations so fast typing never stutters
+        self._script_len_timer = QTimer(self)
+        self._script_len_timer.setSingleShot(True)
+        self._script_len_timer.setInterval(120)
+        self._script_len_timer.timeout.connect(self._check_script_length)
 
         self._setup_ui()
         self._connect_signals()
         self._populate_voices()
         self._load_settings()
         self._refresh_recent_projects()
-        self._check_ollama_status()
+
+        # Defer network/system status check cleanly to background thread right after show
+        self._status_bar.showMessage("🟢 Stickman Studio Ready • Checking local AI engines…")
+        QTimer.singleShot(80, self._check_ollama_status)
 
         # Refresh status periodically without blocking UI
         self._status_timer = QTimer(self)
@@ -476,6 +557,38 @@ class MainWindow(QMainWindow):
         lv = QVBoxLayout(left_card)
         lv.setSpacing(10)
         lv.setContentsMargins(14, 14, 14, 14)
+
+        # ---- Generation Mode Switcher ----
+        mode_frame = QFrame()
+        mode_frame.setObjectName("modeSwitcher")
+        mode_hbox = QHBoxLayout(mode_frame)
+        mode_hbox.setContentsMargins(6, 4, 6, 4)
+        mode_hbox.setSpacing(8)
+
+        self._mode_moving_btn = QPushButton("🎬 Moving Stickman")
+        self._mode_moving_btn.setObjectName("modeBtn")
+        self._mode_moving_btn.setCheckable(True)
+        self._mode_moving_btn.setChecked(True)
+        self._mode_moving_btn.setProperty("data-cis", "false")
+
+        self._mode_cis_btn = QPushButton("✦ Cinematic Illustrated")
+        self._mode_cis_btn.setObjectName("modeBtn")
+        self._mode_cis_btn.setCheckable(True)
+        self._mode_cis_btn.setProperty("data-cis", "true")
+
+        self._gen_mode_btn_group = QButtonGroup(self)
+        self._gen_mode_btn_group.setExclusive(True)
+        self._gen_mode_btn_group.addButton(self._mode_moving_btn)
+        self._gen_mode_btn_group.addButton(self._mode_cis_btn)
+
+        mode_hbox.addWidget(self._mode_moving_btn, stretch=1)
+        mode_hbox.addWidget(self._mode_cis_btn, stretch=1)
+        lv.addWidget(mode_frame)
+
+        # CIS panel (shown only when CIS mode active)
+        self._cis_mode_panel = CISModePanel()
+        self._cis_mode_panel.hide()
+        lv.addWidget(self._cis_mode_panel)
 
         # 1. Topic
         lv.addWidget(self._make_section_header("1. Topic"))
@@ -788,15 +901,23 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _connect_signals(self) -> None:
+        self._cis_mode_panel.auto_speed_changed.connect(self._voice_panel.set_auto_speed)
+        self._voice_panel.auto_speed_changed.connect(self._cis_mode_panel.set_auto_speed)
+        self._bg_engine_combo.currentIndexChanged.connect(self._on_bg_engine_changed)
+        self._cis_mode_panel.illustration_mode_changed.connect(self._on_cis_illus_mode_changed)
         self._duration_combo.currentIndexChanged.connect(self._on_duration_changed)
         self._custom_dur_spin.valueChanged.connect(self._check_script_length)
-        self._script_edit.textChanged.connect(self._check_script_length)
+        self._script_edit.textChanged.connect(self._script_len_timer.start)
 
         self._shorten_btn.clicked.connect(self._on_shorten_script_clicked)
 
         self._music_combo.currentIndexChanged.connect(self._on_music_changed)
         self._import_music_btn.clicked.connect(self._on_import_music)
         self._cap_color_btn.clicked.connect(self._on_pick_highlight_color)
+
+        # Mode switcher
+        self._mode_moving_btn.clicked.connect(lambda: self._on_gen_mode_changed(False))
+        self._mode_cis_btn.clicked.connect(lambda: self._on_gen_mode_changed(True))
 
         self._voice_panel.set_preview_callback(self._on_preview_voice)
         self._settings_btn.clicked.connect(self.show_settings)
@@ -818,6 +939,32 @@ class MainWindow(QMainWindow):
         if val == -1:
             return self._custom_dur_spin.value()
         return int(val or 30)
+
+    def _on_gen_mode_changed(self, cis_active: bool) -> None:
+        """Toggle between Moving Stickman and CIS generation modes."""
+        self._cis_mode_active = cis_active
+        self._cis_mode_panel.setVisible(cis_active)
+        if cis_active:
+            self._generate_btn.setText("✦  Generate Illustrated Video")
+            self._status_bar.showMessage(
+                "✦ Cinematic Illustrated mode — illustrated storybook scenes with Ken Burns animation"
+            )
+        else:
+            self._generate_btn.setText("🎬  Generate Video")
+            self._check_ollama_status()
+
+    def _on_bg_engine_changed(self) -> None:
+        bg_val = self._bg_engine_combo.currentData() or "procedural"
+        self._cis_mode_panel.set_illustration_mode("lcm" if bg_val == "lcm" else "pil")
+
+    def _on_cis_illus_mode_changed(self, mode: str) -> None:
+        target = "lcm" if str(mode or "").lower() == "lcm" else "procedural"
+        self._bg_engine_combo.blockSignals(True)
+        for i in range(self._bg_engine_combo.count()):
+            if self._bg_engine_combo.itemData(i) == target:
+                self._bg_engine_combo.setCurrentIndex(i)
+                break
+        self._bg_engine_combo.blockSignals(False)
 
     def _on_duration_changed(self) -> None:
         is_custom = self._duration_combo.currentData() == -1
@@ -1025,6 +1172,7 @@ class MainWindow(QMainWindow):
             "style_variant": sel_variant,
             "voice_id": vs.get("voice_id", ""),
             "voice_speed": vs.get("speed", 1.0),
+            "auto_voice_speed": bool(vs.get("auto_speed", False)),
             "voice_pitch": vs.get("pitch", 0.0),
             "format": self._format_combo.currentData() or "9:16",
             "resolution": self._res_combo.currentData() or "1080",
@@ -1075,12 +1223,69 @@ class MainWindow(QMainWindow):
         params = self._collect_params(preview_mode=preview_mode)
         self._last_params = params
         self._save_settings()
-        self._start_generation(params)
+        if self._cis_mode_active:
+            self._start_cis_generation(params)
+        else:
+            self._start_generation(params)
 
     def _on_regenerate_clicked(self) -> None:
         if self._last_params:
             params = self._collect_params(preview_mode=False)
-            self._start_generation(params)
+            if self._cis_mode_active:
+                self._start_cis_generation(params)
+            else:
+                self._start_generation(params)
+
+    def _start_cis_generation(self, params: dict) -> None:
+        """Launch CISPipeline for Cinematic Illustrated Stickman generation."""
+        try:
+            from engine.cis_pipeline import CISPipeline  # lazy import
+        except ImportError as exc:
+            QMessageBox.critical(
+                self,
+                "CIS Engine Not Found",
+                f"Could not import CISPipeline:\n{exc}\n\n"
+                "Make sure src/engine/cis_pipeline.py exists and all dependencies are installed.",
+            )
+            return
+
+        # Merge CIS-specific settings into params
+        cis_settings = self._cis_mode_panel.get_cis_settings()
+        auto_spd = bool(cis_settings.get("cis_auto_speed", False) or params.get("auto_voice_speed", False))
+        params = {**params, **cis_settings, "auto_voice_speed": auto_spd, "style": "cis_illustrated"}
+
+        self._preview_player.stop()
+        self._generate_btn.setEnabled(False)
+        self._generate_btn.setText("⏳  Illustrating…")
+        self._preview_render_btn.setEnabled(False)
+
+        cis_pipeline = CISPipeline(
+            llm_manager=self.llm,
+            tts_manager=self.tts,
+            output_dir=self.config.get_output_dir(),
+            temp_dir=self.config.get_temp_dir(),
+        )
+        self._active_cis_pipeline = cis_pipeline
+
+        self._progress_dlg = ProgressDialog(self)
+        self._progress_dlg.setWindowTitle(
+            "Rendering Fast Illustrated Preview…" if params.get("preview_mode") else "Generating Cinematic Illustrated Video…"
+        )
+        self._progress_dlg.cancel_requested.connect(cis_pipeline.cancel)
+
+        self._gen_thread = GenerationThread(cis_pipeline, params)
+        self._gen_thread.stage_updated.connect(self._progress_dlg.update_stage)
+        self._gen_thread.log_added.connect(self._progress_dlg.add_log)
+        self._gen_thread.completed.connect(self._on_cis_generation_complete)
+        self._gen_thread.start()
+
+        self._progress_dlg.exec()
+
+    def _on_cis_generation_complete(self, success: bool, output_path: str) -> None:
+        """Handle CIS generation completion — delegate then restore button label."""
+        self._on_generation_complete(success, output_path)
+        if self._cis_mode_active:
+            self._generate_btn.setText("✦  Generate Illustrated Video")
 
     def _start_generation(self, params: dict) -> None:
         self._preview_player.stop()
@@ -1113,8 +1318,10 @@ class MainWindow(QMainWindow):
         if success and output_path:
             self._last_output_path = output_path
             self._regen_btn.setEnabled(True)
-            if getattr(self.pipeline, "last_script_used", "") and not self._script_edit.toPlainText().strip():
-                self._script_edit.setPlainText(self.pipeline.last_script_used)
+            active_pipe = getattr(self, "_active_cis_pipeline", None) if self._cis_mode_active else self.pipeline
+            last_script = getattr(active_pipe, "last_script_used", "") or getattr(self.pipeline, "last_script_used", "")
+            if last_script and not self._script_edit.toPlainText().strip():
+                self._script_edit.setPlainText(last_script)
             # Styled success path label
             fname = os.path.basename(output_path)
             self._output_path_lbl.setText(f"✅  Saved: {fname}")
@@ -1253,26 +1460,15 @@ class MainWindow(QMainWindow):
         )
 
     def _check_ollama_status(self) -> None:
-        sys_info = get_system_summary()
-        avail_ram_gb = sys_info["available_ram_mb"] / 1024.0
-        total_ram_gb = sys_info["total_ram_mb"] / 1024.0
-        free_vram_mb = sys_info["free_vram_mb"]
+        if self._status_worker is not None and self._status_worker.isRunning():
+            return
+        self._status_worker = _StatusCheckWorker(self.llm, self.tts, self)
+        self._status_worker.status_ready.connect(self._on_status_ready)
+        self._status_worker.start()
 
-        if self.llm.check_ollama_running():
-            model = self.llm.default_model or self.llm.get_recommended_model()
-            loc = self.llm.get_model_run_location()
-            ai_status = f"🟢 Ollama  {model} ({loc})"
-        else:
-            ai_status = "🟢 In-Process AI Director (Native Offline)"
-
-        voices_cnt = len(self.tts.get_available_voices())
-        langs = ",".join(self.tts.get_supported_languages())
-        self._status_bar.showMessage(
-            f"Stickman Studio • Atharv Hatwar  |  "
-            f"RAM: {avail_ram_gb:.1f}/{total_ram_gb:.1f} GB free  |  "
-            f"VRAM free: {free_vram_mb} MB  |  {ai_status}  |  "
-            f"Voices: {voices_cnt} ({langs})"
-        )
+    def _on_status_ready(self, msg: str) -> None:
+        if not self._cis_mode_active:
+            self._status_bar.showMessage(msg)
 
     def _load_settings(self) -> None:
         if self.config.get("last_topic"):
@@ -1281,13 +1477,22 @@ class MainWindow(QMainWindow):
             self._script_edit.setPlainText(self.config.get("last_script"))
 
         self._style_selector.set_selected_style(
-            self.config.get("default_style", "s1_rsa_whiteboard"),
+            self.config.get("default_style", "auto"),
             variant=self.config.get("default_style_variant") or None,
         )
         vs_speed = float(self.config.get("default_speed", 1.0))
         vs_pitch = int(self.config.get("default_pitch", 0))
         vs_vol = int(self.config.get("default_tts_volume", 100))
-        self._voice_panel.set_voice_settings(vs_speed, vs_pitch, vs_vol)
+        vs_auto = bool(self.config.get("default_auto_speed", True))
+        self._voice_panel.set_voice_settings(vs_speed, vs_pitch, vs_vol, auto_speed=vs_auto)
+        self._cis_mode_panel.set_cis_settings({
+            "cis_accent_color": self.config.get("cis_accent_color", "auto"),
+            "cis_visual_style": self.config.get("cis_visual_style", "auto"),
+            "cis_auto_speed": vs_auto,
+            "cis_enable_cta": bool(self.config.get("cis_enable_cta", False)),
+            "cis_cta_text": self.config.get("cis_cta_text", "Follow this page"),
+            "cis_cta_audio_text": self.config.get("cis_cta_audio_text", "Follow this page for more insights like this."),
+        })
 
         saved_dur = int(self.config.get("default_duration", 30))
         matched_dur = False
@@ -1316,6 +1521,7 @@ class MainWindow(QMainWindow):
             if self._bg_engine_combo.itemData(i) == saved_bg:
                 self._bg_engine_combo.setCurrentIndex(i)
                 break
+        self._cis_mode_panel.set_illustration_mode("lcm" if saved_bg == "lcm" else "pil")
 
         saved_music = self.config.get("default_music_style", "auto")
         for i in range(self._music_combo.count()):
@@ -1359,7 +1565,13 @@ class MainWindow(QMainWindow):
             "default_style_variant": self._style_selector.get_selected_variant(),
             "default_voice": vs.get("voice_id", ""),
             "default_speed": vs.get("speed", 1.0),
+            "default_auto_speed": bool(vs.get("auto_speed", False)),
             "default_pitch": vs.get("pitch", 0),
+            "cis_accent_color": self._cis_mode_panel.get_cis_settings().get("cis_accent_color", "auto"),
+            "cis_visual_style": self._cis_mode_panel.get_cis_settings().get("cis_visual_style", "auto"),
+            "cis_enable_cta": bool(self._cis_mode_panel.get_cis_settings().get("cis_enable_cta", False)),
+            "cis_cta_text": self._cis_mode_panel.get_cis_settings().get("cis_cta_text", "Follow this page"),
+            "cis_cta_audio_text": self._cis_mode_panel.get_cis_settings().get("cis_cta_audio_text", ""),
             "default_tts_volume": vs.get("volume", 100),
             "default_duration": self._get_selected_duration(),
             "default_format": self._format_combo.currentData() or "9:16",
@@ -1385,8 +1597,14 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         self._preview_player.stop()
+        if hasattr(self, "_style_selector") and hasattr(self._style_selector, "stop_worker"):
+            self._style_selector.stop_worker()
+        if self._status_worker and self._status_worker.isRunning():
+            self._status_worker.wait(1000)
         if self._gen_thread and self._gen_thread.isRunning():
             self.pipeline.cancel()
+            if getattr(self, "_active_cis_pipeline", None):
+                self._active_cis_pipeline.cancel()
             self._gen_thread.wait(3000)
         if self._script_thread and self._script_thread.isRunning():
             self._script_thread.wait(1500)

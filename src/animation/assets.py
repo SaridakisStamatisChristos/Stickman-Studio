@@ -243,6 +243,20 @@ class AssetLibrary:
             "TREASURE_CHEST":  lambda d, _x, _y, _w, _h: self._draw_treasure_chest(d, _x, _y, _w, _h, t=anim),
             "TREASURE":        lambda d, _x, _y, _w, _h: self._draw_treasure_chest(d, _x, _y, _w, _h, t=anim),
             "BRAIN":           lambda d, _x, _y, _w, _h: self._draw_brain(d, _x, _y, _w, _h, t=anim),
+            # Advanced Psychological Metaphor Props (Created by Atharv Hatwar)
+            "MOUSETRAP":              lambda d, _x, _y, _w, _h: self._draw_mousetrap(d, _x, _y, _w, _h, t=anim),
+            "GLASS_JAR_PRISON":       lambda d, _x, _y, _w, _h: self._draw_glass_jar_prison(d, _x, _y, _w, _h, t=anim),
+            "TETHER_THREAD":          lambda d, _x, _y, _w, _h: self._draw_tether_thread(d, _x, _y, _w, _h, t=anim),
+            "PUPPET_STRINGS":         lambda d, _x, _y, _w, _h: self._draw_puppet_strings(d, _x, _y, _w, _h, t=anim),
+            "SIGH_SHOCKWAVES":        lambda d, _x, _y, _w, _h: self._draw_sigh_shockwaves(d, _x, _y, _w, _h, t=anim),
+            "DOORWAY_SUNLIGHT":       lambda d, _x, _y, _w, _h: self._draw_doorway_sunlight(d, _x, _y, _w, _h, t=anim),
+            "NOTIFICATION_POPUP":     lambda d, _x, _y, _w, _h: self._draw_notification_popups(d, _x, _y, _w, _h, t=anim),
+            "BREADCRUMB_TRAIL":       lambda d, _x, _y, _w, _h: self._draw_breadcrumb_trail(d, _x, _y, _w, _h, t=anim),
+            "BROKEN_CROWN":           lambda d, _x, _y, _w, _h: self._draw_broken_crown(d, _x, _y, _w, _h, t=anim),
+            "GIANT_CLOCK":            lambda d, _x, _y, _w, _h: self._draw_giant_clock(d, _x, _y, _w, _h, t=anim),
+            "SNIPPED_THREAD_SUNRISE": lambda d, _x, _y, _w, _h: self._draw_snipped_thread_sunrise(d, _x, _y, _w, _h, t=anim),
+            "CHASM_CRACK":            lambda d, _x, _y, _w, _h: self._draw_chasm_crack(d, _x, _y, _w, _h, t=anim),
+            "EGO_TROPHY":             lambda d, _x, _y, _w, _h: self._draw_ego_trophy(d, _x, _y, _w, _h, t=anim),
         }
 
         fn = dispatchers.get(name)
@@ -1064,7 +1078,8 @@ class AssetLibrary:
         sc_id = int(scene.get("id", 0)) if scene else 0
         use_lcm = bool(style_params.get("use_lcm") or (scene and scene.get("use_lcm")))
         narr_hash = hashlib.md5(narr.encode("utf-8")).hexdigest()[:8] if narr else ""
-        key = (bg_name.upper(), width, height, sid, var, sc_id, narr_hash, use_lcm)
+        bg_hex = str(style_params.get("bg", ""))
+        key = (bg_name.upper(), width, height, sid, var, bg_hex, sc_id, narr_hash, use_lcm)
         cached = AssetLibrary._BG_CACHE.get(key)
         if cached is not None:
             return cached
@@ -2295,6 +2310,222 @@ class AssetLibrary:
         draw.ellipse([fx - fw * 2, fy - fh - 10, fx + fw * 2, fy + 10], fill=_hex_to_rgba("#F59E0B", 45))
         draw.polygon([(fx, fy - fh), (fx + fw, fy - int(fh * 0.3)), (fx, fy), (fx - fw, fy - int(fh * 0.3))], fill="#F59E0B")
         draw.polygon([(fx, fy - int(fh * 0.7)), (fx + int(fw * 0.5), fy - int(fh * 0.2)), (fx, fy), (fx - int(fw * 0.5), fy - int(fh * 0.2))], fill="#FEF08A")
+
+    # ------------------------------------------------------------------
+    # Advanced Psychological & Storytelling Metaphors (Atharv Hatwar)
+    # ------------------------------------------------------------------
+
+    def _draw_mousetrap(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.5)))
+        # Wooden base block
+        base_y = y + int(h * 0.68)
+        draw.rounded_rectangle([x, base_y, x + w, y + h], radius=6, fill=_hex_to_rgba("#F1F5F9", 250), outline=ink, width=lw)
+        draw.line([(x + 10, base_y + int((y + h - base_y) * 0.45)), (x + w - 10, base_y + int((y + h - base_y) * 0.45))], fill=_hex_to_rgba(ink, 40), width=1)
+        # Coiled metal spring in center
+        cx = x + w // 2
+        draw.arc([cx - 16, base_y - 8, cx + 16, base_y + 14], start=0, end=360, fill=ink, width=lw)
+        # Cocked snap bar angled up menacingly
+        draw.line([(cx, base_y), (x + int(w * 0.84), y + int(h * 0.14))], fill=ink, width=lw + 2)
+        # Bait plate: Smartphone with glowing heart
+        bx1, by1 = x + int(w * 0.18), base_y - int(h * 0.22)
+        bx2, by2 = x + int(w * 0.42), base_y
+        draw.rounded_rectangle([bx1, by1, bx2, by2], radius=4, fill="#FFFFFF", outline=ink, width=lw)
+        # Heart on bait screen
+        hx = (bx1 + bx2) // 2
+        hy = (by1 + by2) // 2
+        hr = max(3, int((bx2 - bx1) * 0.22))
+        draw.ellipse([hx - hr * 2, hy - hr * 2, hx + hr * 2, hy + hr * 2], fill=_hex_to_rgba(acc, 50))
+        draw.ellipse([hx - hr, hy - hr, hx + hr, hy + hr], fill=acc)
+
+    def _draw_glass_jar_prison(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.5)))
+        # High shelf
+        sy = y + int(h * 0.80)
+        draw.rectangle([x, sy, x + w, sy + int(h * 0.08)], fill=_hex_to_rgba("#475569", 230), outline=ink, width=lw)
+        # Shelf brackets underneath
+        draw.line([(x + int(w * 0.25), sy + int(h * 0.08)), (x + int(w * 0.25), y + h)], fill=ink, width=lw)
+        draw.line([(x + int(w * 0.75), sy + int(h * 0.08)), (x + int(w * 0.75), y + h)], fill=ink, width=lw)
+        # Glass jar body
+        jx1, jy1 = x + int(w * 0.18), y + int(h * 0.12)
+        jx2, jy2 = x + int(w * 0.82), sy
+        draw.rounded_rectangle([jx1, jy1, jx2, jy2], radius=16, fill=_hex_to_rgba("#E0F2FE", 55), outline=ink, width=lw)
+        # Glass reflection shine
+        draw.arc([jx1 + 8, jy1 + 10, jx1 + 35, jy2 - 12], start=90, end=270, fill="#FFFFFF", width=max(2, lw - 1))
+        # Jar screw lid
+        draw.rounded_rectangle([x + int(w * 0.25), y + int(h * 0.05), x + int(w * 0.75), jy1], radius=4, fill=acc, outline=ink, width=lw)
+        # Stickman curled inside the jar
+        cx = (jx1 + jx2) // 2
+        cy = (jy1 + jy2) // 2
+        draw.ellipse([cx - 10, cy - 14, cx + 10, cy + 6], fill="#FFFFFF", outline=ink, width=lw)
+        draw.line([(cx, cy + 6), (cx - 4, cy + 24)], fill=ink, width=lw)
+        draw.line([(cx - 4, cy + 24), (cx + 8, cy + 18)], fill=ink, width=lw)
+        draw.line([(cx + 8, cy + 18), (cx + 10, cy + 30)], fill=ink, width=lw)
+
+    def _draw_tether_thread(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.5)))
+        mid_y = y + h // 2
+        # Outer glow
+        draw.line([(x, mid_y), (x + w, mid_y)], fill=_hex_to_rgba(acc, 50), width=lw * 3)
+        # Core taut thread
+        draw.line([(x, mid_y), (x + w, mid_y)], fill=acc, width=lw)
+        # Strain tension markers
+        draw.line([(x + 25, mid_y - 6), (x + 35, mid_y + 6)], fill=acc, width=2)
+        draw.line([(x + w - 35, mid_y - 6), (x + w - 25, mid_y + 6)], fill=acc, width=2)
+
+    def _draw_puppet_strings(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        # Overhead wooden cross controller
+        top_y = y + int(h * 0.08)
+        draw.line([(x + int(w * 0.15), top_y), (x + int(w * 0.85), top_y)], fill=ink, width=lw + 2)
+        draw.line([(x + w // 2, y), (x + w // 2, top_y + 12)], fill=ink, width=lw + 2)
+        # Crimson puppet strings
+        for px in (0.22, 0.42, 0.58, 0.78):
+            sx = x + int(w * px)
+            draw.line([(sx, top_y), (sx, y + int(h * 0.95))], fill=acc, width=lw)
+
+    def _draw_sigh_shockwaves(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        # Expanding acoustic concentric arcs
+        for f in (0.35, 0.65, 0.95):
+            box = [x, y, x + int(w * f), y + int(h * f)]
+            draw.arc(box, start=305, end=55, fill=acc, width=lw)
+
+    def _draw_doorway_sunlight(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        lw = max(2, int(self.sp.get("line_width", 3.5)))
+        # Door frame
+        dx1, dy1 = x + int(w * 0.20), y + int(h * 0.12)
+        dx2, dy2 = x + int(w * 0.80), y + h
+        draw.rectangle([dx1, dy1, dx2, dy2], fill="#FFFFFF", outline=ink, width=lw)
+        # Radiant sunbeams
+        for a in (-0.25, -0.08, 0.08, 0.25):
+            draw.line([(x + w // 2, dy1 + 20), (int(x + w // 2 + a * w * 2.2), dy2)], fill=_hex_to_rgba("#FBBF24", 85), width=max(2, lw - 1))
+        # EXIT sign above door
+        draw.rounded_rectangle([x + int(w * 0.32), y, x + int(w * 0.68), dy1 - 4], radius=3, fill=ink)
+        fnt = _load_ui_font(max(9, int(h * 0.08)), bold=True)
+        draw.text((x + w // 2, (y + dy1 - 4) // 2), "EXIT", fill="#FFFFFF", font=fnt, anchor="mm")
+
+    def _draw_notification_popups(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        # Floating message card
+        card_h = int(h * 0.72)
+        draw.rounded_rectangle([x, y, x + w, y + card_h], radius=10, fill="#FFFFFF", outline=ink, width=lw)
+        # Red circular heart badge
+        bx, by = x + 12, y + 12
+        bw = min(30, int(card_h * 0.45))
+        draw.ellipse([bx, by, bx + bw, by + bw], fill=acc)
+        # Subtext lines
+        fnt = _load_ui_font(max(10, int(card_h * 0.22)), bold=True)
+        draw.text((bx + bw + 10, y + int(card_h * 0.30)), "Story Reply", fill=ink, font=fnt, anchor="lm")
+        fnt2 = _load_ui_font(max(9, int(card_h * 0.18)), bold=False)
+        draw.text((bx + bw + 10, y + int(card_h * 0.65)), "how have you been? 🥺", fill=_hex_to_rgba(ink, 160), font=fnt2, anchor="lm")
+
+    def _draw_breadcrumb_trail(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        acc = self.sp.get("accent", "#E03E36")
+        cy = y + h // 2
+        for i in range(5):
+            bx = x + int(w * (i + 1) / 6)
+            draw.ellipse([bx - 10, cy - 10, bx + 10, cy + 10], fill=_hex_to_rgba(acc, 45))
+            draw.ellipse([bx - 5, cy - 5, bx + 5, cy + 5], fill=acc)
+
+    def _draw_broken_crown(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        # Regal crown base and 3 peaks
+        pts = [
+            (x + int(w * 0.12), y + int(h * 0.82)),
+            (x + int(w * 0.88), y + int(h * 0.82)),
+            (x + w, y + int(h * 0.25)),
+            (x + int(w * 0.68), y + int(h * 0.50)),
+            (x + w // 2, y + int(h * 0.15)),
+            (x + int(w * 0.32), y + int(h * 0.50)),
+            (x, y + int(h * 0.25)),
+        ]
+        draw.polygon(pts, fill=_hex_to_rgba("#F59E0B", 95), outline=ink, width=lw)
+        # Jagged fracture crack
+        draw.line([(x + w // 2, y + int(h * 0.15)), (x + int(w * 0.44), y + int(h * 0.48)), (x + int(w * 0.54), y + int(h * 0.82))], fill=acc, width=lw + 1)
+
+    def _draw_giant_clock(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.5)))
+        # Clock face
+        draw.ellipse([x, y, x + w, y + h], fill="#FFFFFF", outline=ink, width=lw + 1)
+        cx, cy = x + w // 2, y + h // 2
+        r = min(w, h) // 2
+        # Tick marks
+        for a_deg in (0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330):
+            ang = math.radians(a_deg)
+            tx1 = cx + math.cos(ang) * (r - 14)
+            ty1 = cy + math.sin(ang) * (r - 14)
+            tx2 = cx + math.cos(ang) * (r - 4)
+            ty2 = cy + math.sin(ang) * (r - 4)
+            draw.line([(tx1, ty1), (tx2, ty2)], fill=ink, width=2)
+        # Hands: Minute hand up, Hour hand in red
+        draw.line([(cx, cy), (cx, cy - int(r * 0.65))], fill=ink, width=lw + 1)
+        draw.line([(cx, cy), (cx + int(r * 0.45), cy + int(r * 0.25))], fill=acc, width=lw + 2)
+
+    def _draw_snipped_thread_sunrise(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.5)))
+        # Radiant rising sun on horizon
+        sun_box = [x + int(w * 0.15), y + int(h * 0.35), x + int(w * 0.85), y + h + int(h * 0.35)]
+        draw.pieslice(sun_box, start=180, end=360, fill=_hex_to_rgba("#FBBF24", 160), outline=ink, width=lw)
+        # Rising rays
+        cx = x + w // 2
+        cy = y + int(h * 0.70)
+        for a_deg in (200, 230, 270, 310, 340):
+            ang = math.radians(a_deg)
+            rx = cx + math.cos(ang) * (w * 0.45)
+            ry = cy + math.sin(ang) * (h * 0.45)
+            draw.line([(cx, cy), (rx, ry)], fill=_hex_to_rgba("#FBBF24", 90), width=lw)
+        # Snipped red thread ends on ground
+        draw.line([(x + int(w * 0.1), y + int(h * 0.85)), (x + int(w * 0.35), y + int(h * 0.88))], fill=acc, width=lw + 1)
+        draw.line([(x + int(w * 0.65), y + int(h * 0.88)), (x + int(w * 0.9), y + int(h * 0.85))], fill=acc, width=lw + 1)
+        # Cut indicator
+        fnt = _load_ui_font(max(10, int(h * 0.12)), bold=True)
+        draw.text((cx, y + int(h * 0.85)), "*SNIP*", fill=acc, font=fnt, anchor="mm")
+
+    def _draw_chasm_crack(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        lw = max(2, int(self.sp.get("line_width", 3.5)))
+        # Jagged canyon split
+        pts = [
+            (x + int(w * 0.45), y),
+            (x + int(w * 0.55), y),
+            (x + int(w * 0.65), y + int(h * 0.4)),
+            (x + int(w * 0.58), y + h),
+            (x + int(w * 0.42), y + h),
+            (x + int(w * 0.48), y + int(h * 0.5)),
+        ]
+        draw.polygon(pts, fill=_hex_to_rgba(ink, 40), outline=ink, width=lw)
+
+    def _draw_ego_trophy(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#E03E36")
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        # Pedestal
+        draw.rectangle([x + int(w * 0.2), y + int(h * 0.75), x + int(w * 0.8), y + h], fill=_hex_to_rgba("#94A3B8", 120), outline=ink, width=lw)
+        # Trophy cup
+        tx1, ty1 = x + int(w * 0.28), y + int(h * 0.2)
+        tx2, ty2 = x + int(w * 0.72), y + int(h * 0.6)
+        draw.arc([tx1, ty1, tx2, ty2 + int(h * 0.1)], start=0, end=180, fill=_hex_to_rgba("#F59E0B", 180), width=lw + 1)
+        # Red heart on trophy
+        cx = x + w // 2
+        cy = y + int(h * 0.45)
+        draw.ellipse([cx - 8, cy - 8, cx + 8, cy + 8], fill=acc)
 
     @staticmethod
     def _bg_abstract(draw: ImageDraw.ImageDraw, w: int, h: int, sp: dict) -> None:

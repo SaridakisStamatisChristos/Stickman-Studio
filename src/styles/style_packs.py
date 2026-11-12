@@ -665,10 +665,131 @@ STYLE_PACKS: dict[str, StylePack] = {
             ("cinematic", "Moody Noir & Storybook", {}),
         ),
     ),
+    "s15_minimalist_accent": StylePack(
+        id="s15_minimalist_accent",
+        code="S15",
+        collection="creator",
+        name="S15 Minimalist Ink & Accent (Vagus / Metaphor Reel)",
+        short_desc="Bespoke hand-drawn ink on textured paper with vivid focal accent color for psychological storytelling & viral reels",
+        bg="#FDFDFC",
+        bg_secondary="#F5F5F0",
+        fg="#181A18",
+        accent="#E03E36",
+        accent_secondary="#F59E0B",
+        character_palette=("#181A18", "#E03E36", "#F59E0B"),
+        head_fill="#FFFFFF",
+        line_width=4.5,
+        head_radius=19.0,
+        limb_taper=0.22,
+        line_technique="hand_drawn",
+        wobble_px=1.6,
+        paper_grain=0.22,
+        lighting_mode="paper_grain",
+        motion_feel="bouncy_sketch",
+        ease_overshoot=0.18,
+        preferred_transition="SLIDE_LEFT",
+        preferred_camera="MEDIUM",
+        caption_font="Segoe UI Bold",
+        caption_text_color="#FFFFFF",
+        caption_stroke_color="#181A18",
+        caption_bg_color="#181A18",
+        caption_highlight_color="#E03E36",
+        caption_pill_alpha=225,
+        preferred_music="calm",
+        preferred_sfx="pop",
+        variations=(
+            ("coral_red", "Coral Red Focal Accent (#E03E36)", {}),
+            ("amber_gold", "Amber Gold Accent (#F59E0B)", {
+                "accent": "#F59E0B",
+                "caption_highlight_color": "#F59E0B",
+            }),
+            ("electric_cyan", "Electric Cyan Accent (#00F0FF)", {
+                "accent": "#00F0FF",
+                "caption_highlight_color": "#00F0FF",
+            }),
+        ),
+    ),
+    # -----------------------------------------------------------------------
+    # 0. FLAGSHIP AI AUTO DIRECTOR (Mixes any style & creates bespoke styles)
+    # -----------------------------------------------------------------------
+    "auto": StylePack(
+        id="auto",
+        code="AUTO",
+        collection="auto",
+        name="AUTO • AI Script Studio (Best)",
+        short_desc="Intelligently mixes any style per beat AND creates custom script-matched palettes, lighting & motion.",
+        bg="#FAF8F3",
+        bg_secondary="#F1F5F9",
+        fg="#14181F",
+        accent="#7C3AED",
+        accent_secondary="#06B6D4",
+        character_palette=("#14181F", "#7C3AED", "#06B6D4", "#F43F5E"),
+        head_fill="#FAF8F3",
+        filled_head=False,
+        line_width=4.3,
+        head_radius=19.5,
+        limb_taper=0.22,
+        line_technique="hand_drawn",
+        wobble_px=1.1,
+        bg_theme="studio_clean",
+        lighting_mode="clean",
+        paper_grain=0.14,
+        default_background="STAGE",
+        preferred_backgrounds=("STAGE", "OFFICE", "CITY", "MIND", "BEDROOM", "MOUNTAIN"),
+        motion_feel="dynamic_adaptive",
+        ease_overshoot=0.20,
+        preferred_transition="DYNAMIC",
+        preferred_camera="DYNAMIC_CUT",
+        caption_font="Segoe UI Bold",
+        caption_text_color="#FFFFFF",
+        caption_stroke_color="#0F172A",
+        caption_bg_color="#0F172A",
+        caption_highlight_color="#06B6D4",
+        caption_pill_alpha=215,
+        preferred_music="calm",
+        preferred_sfx="pop",
+        variations=(
+            ("smart_mix", "✦ AI Smart Mix + Custom Styles (Best)", {}),
+            ("cinematic_arc", "Cinematic Story Arc (Warm + Noir)", {}),
+            ("modern_editorial", "Editorial Clean + Neon Accents", {}),
+        ),
+    ),
+    # -----------------------------------------------------------------------
+    # CIS: CINEMATIC ILLUSTRATED STICKMAN
+    # -----------------------------------------------------------------------
+    "cis_illustrated": StylePack(
+        id="cis_illustrated",
+        code="CIS",
+        collection="cinematic",
+        name="✦ Cinematic Illustrated",
+        short_desc="B1 illustrated storybook scenes with cinematic Ken Burns animation",
+        bg="#FDFDFC",
+        bg_secondary="#F5F5F3",
+        fg="#1A1A1A",
+        accent="#E94560",
+        accent_secondary="#00897B",
+        character_palette=("#1A1A1A",),
+        head_fill="#FFFFFF",
+        filled_head=False,
+        line_width=3.0,
+        head_radius=22.0,
+        line_technique="hand_drawn",
+        wobble_px=1.5,
+        bg_theme="paper_white",
+        preferred_backgrounds=("ABSTRACT",),
+        preferred_music="calm",
+        preferred_sfx="chime",
+        pacing_multiplier=1.1,
+        preferred_transition="FADE",
+        caption_font="Segoe UI",
+        caption_text_color="#1A1A1A",
+        caption_bg_color="#FDFDFC",
+    ),
 }
 
 CREATOR_STYLE_IDS: tuple[str, ...] = (
     "s1_rsa_whiteboard",
+    "s15_minimalist_accent",
     "s2_cyberpunk_neon",
     "s3_retro_pop_comic",
     "s4_notion_startup",
@@ -687,13 +808,22 @@ ARTISTIC_STYLE_IDS: tuple[str, ...] = (
     "s13_cinematic_storyteller",
 )
 
+AUTO_STYLE_IDS: tuple[str, ...] = ("auto",)
+
+# CIS (Cinematic Illustrated Stickman) style IDs
+CIS_STYLE_IDS: list[str] = ["cis_illustrated"]
+
 # For backward compatibility with existing code and tests
 DIRECTOR_STYLE_IDS: tuple[str, ...] = CREATOR_STYLE_IDS
 AUTOPILOT_STYLE_IDS: tuple[str, ...] = ARTISTIC_STYLE_IDS
-ALL_STYLE_IDS: tuple[str, ...] = CREATOR_STYLE_IDS + ARTISTIC_STYLE_IDS
+ALL_STYLE_IDS: tuple[str, ...] = AUTO_STYLE_IDS + CREATOR_STYLE_IDS + ARTISTIC_STYLE_IDS
 
 # Backwards-compatible mapping from previous style names to new modern packs
 LEGACY_STYLE_MAP: dict[str, tuple[str, Optional[str]]] = {
+    # Flagship Auto mapping
+    "auto_mix":              ("auto", "smart_mix"),
+    "ai_auto":               ("auto", "smart_mix"),
+    "best":                  ("auto", "smart_mix"),
     # Chameleon Adaptive mapping
     "adaptive":              ("s14_chameleon_adaptive", None),
     "mixed":                 ("s14_chameleon_adaptive", None),
@@ -706,7 +836,10 @@ LEGACY_STYLE_MAP: dict[str, tuple[str, Optional[str]]] = {
     "a5_historical_cartoon": ("s3_retro_pop_comic", None),
     "a6_amber_noir":         ("s12_cinematic_noir", None),
     # Previous B1-B5 Autopilot mapping
-    "b1_minimal_line_art":   ("s1_rsa_whiteboard", "white_paper"),
+    "b1":                    ("s15_minimalist_accent", "coral_red"),
+    "b1_minimal_line_art":   ("s15_minimalist_accent", "coral_red"),
+    "vagus":                 ("s15_minimalist_accent", "coral_red"),
+    "metaphor":              ("s15_minimalist_accent", "coral_red"),
     "b2_colorful_hand_drawn":("s1_rsa_whiteboard", "grid_notebook"),
     "b3_retro_tv":           ("s9_retro_arcade", None),
     "b4_survival_thriller":  ("s2_cyberpunk_neon", None),
@@ -720,6 +853,8 @@ LEGACY_STYLE_MAP: dict[str, tuple[str, Optional[str]]] = {
     "dark_cinematic":        ("s5_dark_gold_wealth", None),
     "chalkboard":            ("s6_chalkboard_academy", None),
     "minimal_infographic":   ("s4_notion_startup", None),
+    # CIS legacy mapping
+    "cinematic_illustrated": ("cis_illustrated", None),
 }
 
 
@@ -776,7 +911,11 @@ def get_adaptive_style_for_scene(narration: str = "", emotion: str = "", action:
     if act == "COUNT_MONEY" or any(w in text for w in ("money", "wealth", "dollar", "cash", "rich", "invest", "millionaire", "gold", "profit", "asset")):
         return "s5_dark_gold_wealth"
 
-    # 4. Mystery / Doubt / Question / Dark / Noir
+    # 4. Psychological Metaphors / Manipulation / Sacrifices / Boundaries / Hard Truths
+    if any(w in text for w in ("manipulat", "sacrifice", "martyr", "trap", "guilt", "hostage", "psycholog", "move on", "doesn't want", "won't let", "leash", "tether", "mousetrap", "access to", "bread crumb", "breadcrumbs", "mixed signal", "waste your time", "confuse")):
+        return "s15_minimalist_accent"
+
+    # 5. Mystery / Doubt / Question / Dark / Noir
     if any(w in text for w in ("why", "mystery", "secret", "shadow", "detective", "hidden", "truth", "crime", "dark", "unknown", "whisper")):
         return "s12_cinematic_noir"
 
@@ -794,3 +933,161 @@ def get_adaptive_style_for_scene(narration: str = "", emotion: str = "", action:
 
     # Default versatile explainer
     return "s1_rsa_whiteboard"
+
+
+_CUSTOM_AUTO_RECIPES: list[dict[str, Any]] = [
+    {
+        "recipe_name": "Obsidian Amber Chalk",
+        "base": "s6_chalkboard_academy",
+        "bg": "#11151C",
+        "bg_secondary": "#1A2230",
+        "fg": "#F8FAFC",
+        "accent": "#FBBF24",
+        "accent_secondary": "#38BDF8",
+        "character_palette": ["#F8FAFC", "#FBBF24", "#38BDF8"],
+        "head_fill": "#11151C",
+        "character_rim_color": "#FBBF24",
+        "vignette_strength": 0.35,
+        "paper_grain": 0.14,
+        "caption_highlight_color": "#FBBF24",
+    },
+    {
+        "recipe_name": "Warm Kraft Editorial",
+        "base": "s15_minimalist_accent",
+        "bg": "#F5EFE6",
+        "bg_secondary": "#EAE0D0",
+        "fg": "#1E1B18",
+        "accent": "#D9483B",
+        "accent_secondary": "#2563EB",
+        "character_palette": ["#1E1B18", "#D9483B", "#2563EB"],
+        "head_fill": "#F5EFE6",
+        "wobble_px": 1.3,
+        "paper_grain": 0.24,
+        "caption_highlight_color": "#D9483B",
+    },
+    {
+        "recipe_name": "Midnight Blueprint Neon",
+        "base": "s10_blueprint_cad",
+        "bg": "#0B162C",
+        "bg_secondary": "#132445",
+        "fg": "#E0F2FE",
+        "accent": "#22D3EE",
+        "accent_secondary": "#A78BFA",
+        "character_palette": ["#E0F2FE", "#22D3EE", "#A78BFA"],
+        "head_fill": "#0B162C",
+        "character_rim_color": "#22D3EE",
+        "vignette_strength": 0.28,
+        "caption_highlight_color": "#22D3EE",
+    },
+    {
+        "recipe_name": "Sage Minimalist Ink",
+        "base": "s1_rsa_whiteboard",
+        "bg": "#F1F6F3",
+        "bg_secondary": "#E3EDE7",
+        "fg": "#15221B",
+        "accent": "#0D9488",
+        "accent_secondary": "#EA580C",
+        "character_palette": ["#15221B", "#0D9488", "#EA580C"],
+        "head_fill": "#FFFFFF",
+        "wobble_px": 1.0,
+        "paper_grain": 0.16,
+        "caption_highlight_color": "#14B8A6",
+    },
+    {
+        "recipe_name": "Velvet Violet Noir",
+        "base": "s12_cinematic_noir",
+        "bg": "#13111C",
+        "bg_secondary": "#201B30",
+        "fg": "#F5F3FF",
+        "accent": "#C084FC",
+        "accent_secondary": "#38BDF8",
+        "character_palette": ["#F5F3FF", "#C084FC", "#38BDF8"],
+        "head_fill": "#13111C",
+        "character_rim_color": "#C084FC",
+        "vignette_strength": 0.40,
+        "caption_highlight_color": "#C084FC",
+    },
+]
+
+
+def synthesize_auto_style_for_scene(
+    narration: str = "",
+    emotion: str = "",
+    action: str = "",
+    scene_idx: int = 0,
+    total_scenes: int = 1,
+    topic: str = "",
+    variant: str = "smart_mix",
+) -> tuple[StylePack, dict[str, Any]]:
+    """
+    Flagship AI Auto Style Director:
+    Mixes existing style packs (S1-S15) AND creates custom hybrid visual recipes
+    tuned to each scene's meaning, emotional tone, and position in the story arc.
+    """
+    import hashlib
+
+    text = f"{narration} {topic}".lower()
+    seed_bytes = hashlib.blake2b(f"{topic}::{narration}::{scene_idx}".encode("utf-8", errors="ignore"), digest_size=4).digest()
+    seed = int.from_bytes(seed_bytes, "big")
+
+    # 1. Decide whether to craft a bespoke custom hybrid recipe (~40% of beats) or select an ideal pack
+    variant_norm = (variant or "smart_mix").strip().lower()
+    base_sid = get_adaptive_style_for_scene(narration, emotion, action)
+
+    if variant_norm == "cinematic_arc":
+        arc_pool = [
+            "s15_minimalist_accent", "s12_cinematic_noir",
+            "s7_ghibli_watercolor", "s8_shonen_manga", "s13_cinematic_storyteller",
+        ]
+        if base_sid not in arc_pool:
+            base_sid = arc_pool[(scene_idx + seed) % len(arc_pool)]
+    elif variant_norm == "modern_editorial":
+        ed_pool = [
+            "s4_notion_startup", "s1_rsa_whiteboard",
+            "s2_cyberpunk_neon", "s10_blueprint_cad", "s5_dark_gold_wealth",
+        ]
+        if base_sid not in ed_pool:
+            base_sid = ed_pool[(scene_idx + seed) % len(ed_pool)]
+
+    use_custom_recipe = (variant_norm == "smart_mix" and ((seed + scene_idx * 3) % 5 in (1, 3)))
+    if use_custom_recipe:
+        # Match recipe mood to script text
+        if any(w in text for w in ("night", "dark", "fear", "overthink", "secret", "shadow", "doubt")):
+            recipe = _CUSTOM_AUTO_RECIPES[4 if (seed % 2 == 0) else 0]
+        elif any(w in text for w in ("system", "tech", "code", "logic", "plan", "future", "focus")):
+            recipe = _CUSTOM_AUTO_RECIPES[2]
+        elif any(w in text for w in ("calm", "peace", "heal", "grow", "habit", "morning", "nature")):
+            recipe = _CUSTOM_AUTO_RECIPES[3]
+        else:
+            recipe = _CUSTOM_AUTO_RECIPES[(seed + scene_idx) % len(_CUSTOM_AUTO_RECIPES)]
+
+        pack, params = resolve_style_pack(recipe["base"])
+        for k, v in recipe.items():
+            if k not in ("recipe_name", "base"):
+                params[k] = v
+        params["auto_recipe_name"] = recipe["recipe_name"]
+    else:
+        pack, params = resolve_style_pack(base_sid)
+        params["auto_recipe_name"] = pack.name
+
+    # Dynamic energy tuning per sentence punctuation & narrative beat
+    emo_u = (emotion or "").upper()
+    if "?" in narration or emo_u in ("CONFUSED", "SURPRISED", "SHOCKED"):
+        params["preferred_camera"] = "PUNCH_IN" if (scene_idx % 2 == 0) else "CLOSE"
+        params["preferred_transition"] = "ZOOM_IN" if scene_idx > 0 else "FADE"
+    elif "!" in narration or emo_u == "EXCITED":
+        params["motion_feel"] = "bouncy_sketch"
+        params["ease_overshoot"] = max(float(params.get("ease_overshoot", 0.15)), 0.24)
+        params["preferred_transition"] = "SNAP_CUT"
+    elif emo_u in ("CALM", "SAD"):
+        params["motion_feel"] = "gentle_slow"
+        params["preferred_camera"] = "SLOW_ZOOM_IN"
+        params["preferred_transition"] = "FADE"
+    else:
+        cams = ("MEDIUM", "SLOW_ZOOM_IN", "PAN_RIGHT", "WIDE")
+        trans = ("SLIDE_LEFT", "FADE", "WIPING_BAR", "ZOOM_IN")
+        params["preferred_camera"] = cams[(seed + scene_idx) % len(cams)]
+        params["preferred_transition"] = trans[(seed + scene_idx) % len(trans)]
+
+    params["auto_synthesized"] = True
+    return pack, params
