@@ -3,13 +3,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/atharv01h"><img src="https://img.shields.io/badge/Creator-Atharv%20Hatwar-8A2BE2.svg?style=for-the-badge&logo=github" alt="Creator: Atharv Hatwar"></a>
+  <a href="https://github.com/atharv01h"><img src="https://img.shields.io/badge/Creator-Atharv%20Hatwar-7C3AED.svg?style=for-the-badge&logo=github" alt="Creator: Atharv Hatwar"></a>
   <a href="https://github.com/atharv01h/Stickman-Studio"><img src="https://img.shields.io/badge/Repository-Stickman--Studio-0078D6.svg?style=for-the-badge&logo=github" alt="Repository: Stickman-Studio"></a>
   <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License: MIT">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6.svg?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 10 / 11">
-  <img src="https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg?style=for-the-badge" alt="100% Offline">
-  <img src="https://img.shields.io/badge/Hardware-4GB%20VRAM%20%7C%208GB%20RAM-orange.svg?style=for-the-badge&logo=nvidia" alt="GTX 1650 Ready">
+  <img src="https://img.shields.io/badge/Privacy-100%25%20Offline-22C55E.svg?style=for-the-badge" alt="100% Offline">
+  <img src="https://img.shields.io/badge/Zero_Cloud-100%25_Free-06B6D4.svg?style=for-the-badge" alt="100% Free & Offline">
 </p>
 
 ---
@@ -17,64 +17,86 @@
 # 🎬 Stickman Studio
 
 > **Designed and Engineered by [Atharv Hatwar](https://github.com/atharv01h)**  
-> An autonomous, 100% local, offline AI video production suite for Windows. Turn any topic or script into a fully animated, professionally narrated, kinetic stickman reel or film in minutes — with zero paid cloud APIs, zero subscriptions, and 100% local privacy.
+> An autonomous, **100% local, free, offline AI video production suite** for Windows. Turn any topic or narration script into a dynamic, voiced, full-screen animated reel or explainer film — **Moving Stickman** or **Cinematic Illustrated Reels** — with zero paid APIs, zero subscriptions, and full privacy.
 
 ---
 
-## 🌟 Overview
+## 🌟 Studio Interface Overview
 
-**Stickman Studio** brings studio-grade animated video production straight to consumer hardware. Built specifically to run smoothly on standard laptops and desktops (such as an AMD Ryzen 5 with an NVIDIA GTX 1650 and 8 GB RAM — or CPU-only systems), it combines **two complete animation modes** (`Moving Stickman` & `Cinematic Illustrated Stickman`), a script-aware AI Director, procedural vector & diffusion backgrounds, offline Kokoro ONNX neural voice acting, procedural sound design, and FFmpeg encoding inside a fast dark **Obsidian-Studio** desktop app.
+Stickman Studio runs inside a sleek, non-blocking **Obsidian-Studio PySide6 UI** built for fast startup (`< 1s`), smooth tab switching, live style card previews rendered asynchronously, and instant two-way engine controls:
 
 <p align="center">
-  <img src="docs/images/sample_scene.png" alt="Sample Scene Render" width="90%">
+  <img src="docs/images/ui_studio.png" alt="Stickman Studio Obsidian Dark UI" width="95%">
 </p>
 
 ---
 
 ## ✨ Key Highlights
 
-- 🔒 **100% Free, Local & Offline**: Zero cloud reliance and zero paid APIs. Uses local Kokoro ONNX / Windows SAPI TTS, local procedural vector graphics, optional local Ollama models, and optional local `SimianLuo/LCM_Dreamshaper_v7` diffusion.
-- 🎬 **Dual Production Modes**:
-  - **Mode 1 — Moving Stickman Studio**: Kinetic joint-animated stickmen with 3-phase acting kinematics, blinking, eye-tracking, dynamic props, camera moves, and **16 Visual Style Options** led by the flagship **`AUTO • AI Script Studio (Best)`** synthesizer.
-  - **Mode 2 — Cinematic Illustrated Stickman (CIS)**: Full-screen animated illustration reels built for psychology, storytelling, self-improvement, and relationship scripts across **20 script-matched choreographies**, **6 dynamic layout architectures**, and **per-shot mixed canvas themes (`AUTO_MIX`, `B1`, `B2`, `B3`)**.
-- ✨ **Flagship `AUTO` Style Synthesizer**:
-  - Dynamically mixes existing style packs per scene **and** synthesizes bespoke hybrid color palettes, lighting, and camera rhythms (such as *Obsidian Amber Chalk*, *Warm Kraft Editorial*, *Midnight Blueprint Neon*, *Sage Minimalist Ink*, and *Velvet Violet Noir*) matched directly to your script's meaning and emotional beat.
-- 🧠 **True Script-to-Visual Precision (20 Choreographies + 12 Semantic Props)**:
-  - Recognizes real story motifs (`give_and_withdraw`, `boundary_shield`, `tether_break`, `mind_storm_calm`, `idea_spark_build`, `two_path_fork`, `mirror_truth`, `domino_chain`, `iceberg_depth`, `rocket_breakthrough`, `spotlight_reveal`, etc.) and draws matching semantic props (`heart`, `shield`, `coin`, `book`, `clock`, `lightning`, `brain`, `key`, `crown`, `phone`, `spark`) so reels never repeat the same template.
-- 🎨 **Dual Background Engine (`Procedural Vector AI` & `LCM DreamShaper`)**:
-  - Works seamlessly across **both Mode 1 and CIS Mode 2** (with synchronized UI selectors): choose instant zero-GPU procedural backdrops or local 4-step `LCM_Dreamshaper_v7` diffusion scenic backdrops (`9:16`, `16:9`, `1:1`).
-- 🎚️ **Smart Auto Voice Speed & Optional Ending Follow/CTA Screen**:
-  - Automatically calibrates narration speaking pace (`compute_auto_voice_speed` + measured refinement) to match script length and video duration, and optionally generates a custom animated ending **Follow / Subscribe CTA screen** with bespoke closing voiceover (`"Follow this page"`, `"Follow me"`, `"Save & Follow"`, or custom text).
-- ⚡ **Fast, Non-Blocking Obsidian-Studio UI**:
-  - Asynchronous style thumbnail rendering (`QThread`), off-thread Ollama status probing, debounced script metrics, and clean batched list updates keep startup under 1 second with smooth navigation.
-- 🔊 **Built-In Sound Design & Fullscreen Encoding**:
-  - Procedural DSP ambient scores and SFX (`pop`, `whoosh`, `impact`, `success`) with sidechain ducking, full-screen `9:16` / `16:9` / `1:1` output, and hardware NVENC or x264 H.264 export.
+| Feature | What It Does |
+|---|---|
+| 🔒 **100% Free & Offline** | Zero cloud APIs or recurring keys. Powered by local **Kokoro ONNX / SAPI TTS**, procedural vector engines, optional local **Ollama**, and optional local **`LCM_Dreamshaper_v7`**. |
+| 🎭 **Dual Animation Modes** | Switch seamlessly between **Mode 1: Moving Stickman** (full joint kinematics & 2.5D rooms) and **Mode 2: Cinematic Illustrated Reels** (`CISPipeline` multi-sprite & canvas reels). |
+| ✨ **Flagship `AUTO` Style Synthesizer** | Default **`AUTO • AI Script Studio (Best)`** dynamically mixes styles per beat **and** invents bespoke hybrid palettes & lighting (*Obsidian Amber Chalk*, *Velvet Violet Noir*, *Warm Kraft Editorial*, etc.). |
+| 🧠 **20 Script-Matched Choreographies** | Semantic planner maps your script clauses directly into story metaphors (`give_and_withdraw`, `boundary_shield`, `tether_break`, `mind_storm_calm`, `two_path_fork`, `domino_chain`, etc.) with 12 custom props. |
+| 🎨 **Dual Background AI (`Procedural` vs. `LCM`)** | Choose **Procedural Vector AI** (instant CPU speed) or **Local Diffusion (`LCM DreamShaper`)** across **both** Moving Stickman & CIS Mode 2 with synchronized controls. |
+| 🎙️ **Smart Auto Voice Speed & CTA Screen** | Auto-calibrates TTS pacing to fit duration naturally (`compute_auto_voice_speed` + refinement) and optionally appends a custom animated **Ending `+ FOLLOW` / CTA Screen** with spoken outreach. |
+| ⚡ **Fast Non-Blocking Desktop Engine** | Background `QThread` card rendering, off-thread Ollama discovery, debounced script counting, and GPU NVENC or x264 H.264 export in `9:16`, `16:9`, or `1:1`. |
 
 ---
 
-## 🎭 Dual Generation Modes
+## 🎭 Dual Production Modes in Action
 
-### Mode 1: Moving Stickman (`SceneComposer`)
-- Full procedural 2x supersampled stickman acting, prop handoffs, facial expressions, blinking, and camera choreography (`PUNCH_IN`, `SLOW_ZOOM_IN`, `PAN_RIGHT`, `WIDE`).
-- Interactive **16-Card Visual Style Gallery** (`auto` hero card + `s1`–`s15` style packs).
-
-### Mode 2: Cinematic Illustrated Stickman (`CISPipeline`)
-- Storyboarded specifically around script clauses (`balanced`, `detailed`, or `compact` pacing) into:
-  - **20 Distinct Choreographies**: `give_and_withdraw`, `boundary_shield`, `tether_break`, `mind_storm_calm`, `idea_spark_build`, `two_path_fork`, `question_burst`, `balance_scale`, `spotlight_reveal`, `split_myth_reality`, `rocket_breakthrough`, `crowd_filter`, `loop_escape`, `iceberg_depth`, `domino_chain`, `bridge_cross`, `magnet_orbit`, `clock_sprint`, `stair_climb`, `cta_celebration`.
-  - **6 Layout Architectures**: `clean_stage`, `big_typo_banner`, `split_screen`, `comic_beats`, `floating_callout`, `editorial_spread`.
-  - **Visual Canvas Options**: `auto` (`AUTO_MIX` — alternates warm craft paper, sage paper, blueprint grid, dark obsidian neon, and charcoal themes per beat), `B1` (Whiteboard Grid Paper), `B2` (Tinted Card Editorial), and `B3` (Dark Chalkboard Neon).
-  - **Illustration / Background Engines**: `Hand-Drawn B1 (Procedural Vector AI)` or `Local Diffusion (LCM DreamShaper)`.
-  - **Custom Ending CTA Screen**: Optional interactive `+ FOLLOW` / `+ SUBSCRIBE` / `BOOKMARK & FOLLOW` closing card with animated cursor tap, bell ring, and custom spoken audio.
-
----
-
-## 🎨 Visual Style Showcase (Mode 1)
-
-Stickman Studio includes **16 Style Selections** (`auto` AI Script Studio + 15 handcrafted style packs `S1`–`S15`):
+### 1. Mode 2 — Cinematic Illustrated Stickman Reels (`CISPipeline`)
+Designed for psychology, mindset, storytelling, and viral short-form reels — every scene selects its matching choreography, layout architecture, prop visual, and `AUTO_MIX` canvas backdrop:
 
 <p align="center">
-  <img src="docs/images/styles_grid.png" alt="Styles Showcase Grid" width="90%">
+  <img src="docs/images/cis_choreographies_showcase.png" alt="CIS Mode 2 Choreographies & Ending CTA Showcase" width="95%">
 </p>
+
+- **Canvas Styles (`Visual World & Style`)**:
+  - `✨ Auto (Mix + Custom Styles)` (`AUTO_MIX` — alternates craft paper, sage canvas, blueprint grid, obsidian neon, and charcoal themes per beat)
+  - `📒 Sketchbook Paper (B1 Grid)` · `🎨 Clean Editorial (B2 Tinted)` · `🌌 Dark Chalkboard (B3 Neon)`
+- **6 Layout Architectures**: `clean_stage`, `big_typo_banner`, `split_screen`, `comic_beats`, `floating_callout`, `editorial_spread`.
+- **Optional Ending Follow / CTA Screen**: Configurable button presets (`+ FOLLOW`, `+ SUBSCRIBE`, `BOOKMARK & FOLLOW`), on-screen headline, cursor tap animation, ringing bell, and custom voiceover.
+
+<details>
+<summary><b>Click to view all 20 CIS Choreographies & 12 Semantic Props</b></summary>
+
+- **20 Choreographies**: `give_and_withdraw`, `boundary_shield`, `tether_break`, `mind_storm_calm`, `idea_spark_build`, `two_path_fork`, `question_burst`, `balance_scale`, `spotlight_reveal`, `split_myth_reality`, `rocket_breakthrough`, `crowd_filter`, `loop_escape`, `iceberg_depth`, `domino_chain`, `bridge_cross`, `magnet_orbit`, `clock_sprint`, `stair_climb`, `cta_celebration`.
+- **12 Semantic Props**: `heart`, `coin`, `book`, `shield`, `clock`, `lightning`, `brain`, `key`, `crown`, `phone`, `spark`, `default_card`.
+
+</details>
+
+---
+
+### 2. Dual Background AI: Procedural Vector AI vs. Local `LCM DreamShaper`
+
+Switch effortlessly between lightning-fast **Procedural Vector AI** and locally cached **`SimianLuo/LCM_Dreamshaper_v7`** diffusion backdrops — both **Background AI** and **Illustration Engine** controls stay synchronized automatically:
+
+<p align="center">
+  <img src="docs/images/lcm_vs_procedural.png" alt="Procedural Vector AI vs LCM DreamShaper Diffusion Comparison" width="95%">
+</p>
+
+> [!TIP]
+> On systems with limited VRAM or CPU-only setups, `LCM DreamShaper` caches every generated scene backdrop locally and automatically unloads model weights from memory once illustration finishes so TTS and video encoding run at full speed.
+
+---
+
+### 3. Mode 1 — Moving Stickman (`SceneComposer`) & `AUTO` Style Synthesizer
+
+Full procedural 2x supersampled stickman acting, prop handoffs, facial expressions, eye tracking, blinking, camera motion, and **`AUTO` Scene Style Synthesis**:
+
+<p align="center">
+  <img src="docs/images/auto_styles_showcase.png" alt="Mode 1 AUTO Style Synthesizer Multi-Beat Render" width="95%">
+</p>
+
+<p align="center">
+  <img src="docs/images/sample_scene.png" alt="Moving Stickman 2.5D Scene Render" width="90%">
+</p>
+
+<details>
+<summary><b>Click to view all 16 Visual Styles in Mode 1 (`auto` + S1–S15)</b></summary>
 
 | ID | Style Name | Description |
 |---|---|---|
@@ -95,6 +117,8 @@ Stickman Studio includes **16 Style Selections** (`auto` AI Script Studio + 15 h
 | `s14_chameleon_adaptive` | **S14 Chameleon Dynamic** | Adaptive scene-by-scene selection across classic packs by mood |
 | `s15_minimalist_accent` | **S15 Minimalist Ink & Accent** | High-impact distraction-free ink & single bold accent storytelling |
 
+</details>
+
 ---
 
 ## 🏛️ System Architecture
@@ -106,8 +130,8 @@ Stickman Studio includes **16 Style Selections** (`auto` AI Script Studio + 15 h
             ┌──────────────────────────────────┴──────────────────────────────────┐
             ▼                                                                     ▼
    [ Moving Stickman Mode ]                                        [ Cinematic Illustrated Mode ]
- • Style Synthesizer (`auto`, S1–S15)                            • Semantic Storyboarder (20 Choreos)
- • 3-Phase Joint Kinematics                                      • Multi-Sprite & Prop Animator
+ • AUTO Style Synthesizer + S1–S15                               • Semantic Storyboarder (20 Choreos)
+ • 3-Phase Joint Kinematics                                      • Multi-Sprite & Semantic Prop Animator
  • Procedural Rooms & LCM Diffusion                              • AUTO_MIX / B1 / B2 / B3 + LCM Diffusion
             │                                                                     │
             └──────────────────────────────────┬──────────────────────────────────┘
@@ -154,48 +178,38 @@ cd Stickman-Studio
 
 ### 2. One-Click Setup (Run Once with Internet)
 
-Run the automated installer script to download the local dependencies:
+Run the automated installer script to configure local packages and binaries:
 
 ```batch
 setup_windows.bat
 ```
 
-This script will automatically configure:
-- Essential Python packages (`PySide6`, `Pillow`, `numpy`, `soundfile`, `requests`)
-- FFmpeg video encoding binary
-- Embedded In-Process AI Director (Native Python, zero external daemons required)
-- Kokoro ONNX offline neural TTS model
+This configures:
+- Core Python packages (`PySide6`, `Pillow`, `numpy`, `soundfile`, `requests`)
+- Local FFmpeg video encoding binary
+- In-process scene planner & offline Kokoro ONNX neural TTS model
 
-> **Note**: Once setup finishes and optional local models (`Kokoro`, `LCM_Dreamshaper_v7`) are cached, you can completely disconnect your internet connection. Everything runs 100% offline.
+> [!NOTE]
+> Once setup completes and local models (`Kokoro ONNX`, optional `LCM_Dreamshaper_v7`) are cached, you can disconnect from the internet completely — everything runs 100% offline.
 
-### 3. Launch the Studio
-
-Double-click `run.bat` or run:
-
-```bash
-python main.py
-```
-
-### 4. Diagnostic Health Check
-
-Verify your system's offline components, GPU acceleration status, and libraries at any time:
+### 3. Launch & Health Check
 
 ```batch
-health_check.bat
+run.bat          :: Launch GUI (or run: python main.py)
+health_check.bat :: Verify dependencies, FFmpeg & GPU status
 ```
 
 ---
 
 ## 🎬 How to Generate Your First Video
 
-1. **Launch**: Open the application via `run.bat` or `python main.py`.
-2. **Choose Mode**: Pick **Moving Stickman** or **✦ Cinematic Illustrated** at the top of the studio panel.
-3. **Input Topic & Script**: Type your topic and paste your script (or choose AI auto-generate / improve).
-4. **Pick Visual Style & Background AI**:
-   - Leave **Animation Style** on **`AUTO • AI Script Studio (Best)`** (or pick any custom style card / `B1`–`B3` canvas in CIS mode).
-   - Select **Procedural Vector AI** (instant CPU) or **LCM DreamShaper AI** (local diffusion scenic backdrops).
-5. **Voice, Pacing & Ending CTA**: Pick a Kokoro ONNX narrator voice, keep **Auto Voice Speed** enabled, and optionally toggle **Ending Follow / CTA Screen**.
-6. **Generate & Preview**: Click **Generate Video** (or **Generate Illustrated Video**), then watch and export directly from the built-in Preview tab or `output/` folder.
+1. **Choose Production Mode**: Select **Moving Stickman** or **✦ Cinematic Illustrated** at the top left.
+2. **Enter Topic & Script**: Type a topic and paste your script (or pick **Auto-Generate** / **Improve**).
+3. **Select Style & Background AI**:
+   - Keep **`AUTO • AI Script Studio (Best)`** / **`✨ Auto (Mix + Custom Styles)`** selected for dynamic script-matched variety.
+   - Pick **Procedural Vector AI** (instant) or **LCM DreamShaper AI** (local diffusion scenic backdrops).
+4. **Voice Speed & Ending CTA**: Keep **Voice Speed: Auto (Smart Fit)** enabled and optionally toggle **Ending Follow / CTA Screen** with your handle/call-to-action.
+5. **Generate & Export**: Click **Generate Video** (or **Generate Illustrated Video**), preview right inside the **Preview & Export** tab, or find your rendered MP4 inside `output/`.
 
 ---
 
@@ -206,7 +220,14 @@ Stickman-Studio/
 ├── assets/
 │   └── fonts/                         # Bundled Caveat & NotoSans typography + OFL licenses
 ├── docs/
-│   └── images/                        # Visual previews and showcase frames
+│   └── images/                        # Banner, UI screenshots & rendered feature showcases
+│       ├── banner.png
+│       ├── ui_studio.png
+│       ├── cis_choreographies_showcase.png
+│       ├── lcm_vs_procedural.png
+│       ├── auto_styles_showcase.png
+│       ├── sample_scene.png
+│       └── styles_grid.png
 ├── src/
 │   ├── animation/                     # Moving Stickman kinematics, props, & compositor
 │   │   ├── assets.py                  # Procedural vector props & cache-keyed backgrounds
@@ -254,9 +275,9 @@ Stickman-Studio/
   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
   ```
 - **NVENC Hardware Encoding**:
-  In **Settings → Performance**, ensure **NVIDIA Hardware Acceleration (NVENC)** is checked. This offloads video rendering to the GTX 1650 encoder chip, rendering 1080p video in a fraction of the time.
+  In **Settings → Performance**, ensure **NVIDIA Hardware Acceleration (NVENC)** is checked to offload H.264 video encoding to your GPU.
 - **Memory Management**:
-  Both the LLM and LCM DreamShaper pipeline automatically unload after their stage completes to preserve RAM/VRAM for TTS synthesis and video encoding.
+  Both the Ollama LLM and LCM DreamShaper pipeline automatically unload after their stage completes to free RAM/VRAM for TTS synthesis and video encoding.
 
 ---
 
