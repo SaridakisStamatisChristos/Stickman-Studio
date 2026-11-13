@@ -4,9 +4,12 @@
 
 <p align="center">
   <a href="https://github.com/atharv01h"><img src="https://img.shields.io/badge/Creator-Atharv%20Hatwar-7C3AED.svg?style=for-the-badge&logo=github" alt="Creator: Atharv Hatwar"></a>
-  <a href="https://github.com/atharv01h/Stickman-Studio"><img src="https://img.shields.io/badge/Repository-Stickman--Studio-0078D6.svg?style=for-the-badge&logo=github" alt="Repository: Stickman-Studio"></a>
+  <a href="https://github.com/atharv01h/Stickman-Studio/stargazers"><img src="https://img.shields.io/github/stars/atharv01h/Stickman-Studio?style=for-the-badge&logo=github&color=F59E0B" alt="GitHub Stars"></a>
+  <a href="https://github.com/atharv01h/Stickman-Studio/network/members"><img src="https://img.shields.io/github/forks/atharv01h/Stickman-Studio?style=for-the-badge&logo=github&color=6366F1" alt="GitHub Forks"></a>
+  <a href="https://github.com/atharv01h/Stickman-Studio/issues"><img src="https://img.shields.io/github/issues/atharv01h/Stickman-Studio?style=for-the-badge&color=EC4899" alt="GitHub Issues"></a>
+  <a href="https://github.com/atharv01h/Stickman-Studio/pulls"><img src="https://img.shields.io/badge/PRs-Welcome-22C55E.svg?style=for-the-badge" alt="PRs Welcome"></a>
   <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License: MIT">
-  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6.svg?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 10 / 11">
   <img src="https://img.shields.io/badge/Privacy-100%25%20Offline-22C55E.svg?style=for-the-badge" alt="100% Offline">
   <img src="https://img.shields.io/badge/Zero_Cloud-100%25_Free-06B6D4.svg?style=for-the-badge" alt="100% Free & Offline">
@@ -18,6 +21,22 @@
 
 > **Designed and Engineered by [Atharv Hatwar](https://github.com/atharv01h)**  
 > An autonomous, **100% local, free, offline AI video production suite** for Windows. Turn any topic or narration script into a dynamic, voiced, full-screen animated reel or explainer film — **Moving Stickman** or **Cinematic Illustrated Reels** — with zero paid APIs, zero subscriptions, and full privacy.
+
+<p align="center">
+  <b>⭐ If you find Stickman Studio useful, please star the repository — it helps more creators discover free, open-source video tools!</b>
+</p>
+
+### ⚖️ Why Stickman Studio? (vs. Cloud Video SaaS)
+
+| Capability | **Stickman Studio (Open Source)** | Commercial SaaS (Vyond / InVideo / Doodly) | Cloud Generative AI (Sora / Runway / Kling) |
+|---|---|---|---|
+| **Price** | **100% Free Forever** | $30 – $99 / month | $20 – $100 / month (credit drains) |
+| **Data Privacy** | **100% Local & Offline** | Cloud hosted & user-data logged | Cloud processed & stored |
+| **API Keys & Accounts** | **Zero Keys / No Accounts** | Mandatory login & subscription | Paid API credits required |
+| **Animation Quality** | **Physics-based procedural kinematics** | Static pre-baked puppet clipart | Hallucinatory morphing & artifacts |
+| **Speech Narration** | **Local Kokoro-82M ONNX (Natural)** | ElevenLabs add-on ($$$) or robotic TTS | Additional paid audio add-on |
+| **Choreography Control** | **20 Semantic Story Metaphors** | Manual timeline keyframing | Random prompt lottery |
+| **Rendering Speed** | **Fast CPU / GPU NVENC streaming** | Cloud queue bottlenecks | Server generation wait times |
 
 ---
 
@@ -267,11 +286,17 @@ health_check.bat :: Verify dependencies, FFmpeg & GPU status
 
 ```
 Stickman-Studio/
+├── .github/                           # Community health & issue templates
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   └── feature_request.md
+│   └── pull_request_template.md
 ├── assets/
 │   └── fonts/                         # Bundled Caveat & NotoSans typography + OFL licenses
-├── docs/
+├── docs/                              # Visual documentation & media assets
 │   └── images/                        # Banner, UI screenshots & rendered feature showcases
 │       ├── banner.png
+│       ├── social_preview.png         # GitHub 1280x640 OpenGraph social preview card
 │       ├── ui_studio.png
 │       ├── cis_choreographies_showcase.png
 │       ├── lcm_vs_procedural.png
@@ -311,6 +336,7 @@ Stickman-Studio/
 │   ├── utils/                         # Configuration and hardware detection
 │   └── video/                         # Mode 1 FFmpeg NVENC/CPU encoding pipeline
 ├── .gitignore                         # Clean repository filter (blocks cache/models/temp)
+├── CONTRIBUTING.md                    # Contributor guide & development setup
 ├── health_check.bat                   # Diagnostic environment checker
 ├── LICENSE                            # MIT License (Atharv Hatwar)
 ├── main.py                            # Application launch orchestrator
@@ -333,6 +359,30 @@ Stickman-Studio/
   In **Settings → Performance**, ensure **NVIDIA Hardware Acceleration (NVENC)** is checked to offload H.264 video encoding to your GPU.
 - **Memory Management**:
   Both the Ollama LLM and LCM DreamShaper pipeline automatically unload after their stage completes to free RAM/VRAM for TTS synthesis and video encoding.
+
+---
+
+## ⭐ Star History
+
+If you love Stickman Studio and want to support free, open-source creative technology, please consider giving us a star! Every star helps creators find open-source alternatives to paid SaaS.
+
+<p align="center">
+  <a href="https://star-history.com/#atharv01h/Stickman-Studio&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=atharv01h/Stickman-Studio&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=atharv01h/Stickman-Studio&type=Date" />
+      <img alt="Stickman Studio Star History Chart" src="https://api.star-history.com/svg?repos=atharv01h/Stickman-Studio&type=Date" width="85%" />
+    </picture>
+  </a>
+</p>
+
+---
+
+## 🤝 Community & Contributions
+
+We welcome contributions from animators, developers, and creators worldwide:
+- **Contributing Guidelines**: Check out [CONTRIBUTING.md](CONTRIBUTING.md) for architecture guides and PR instructions.
+- **Bug Reports & Ideas**: Open an issue using our [GitHub Issue Templates](https://github.com/atharv01h/Stickman-Studio/issues/new/choose).
 
 ---
 
