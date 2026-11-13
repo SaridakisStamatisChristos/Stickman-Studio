@@ -31,6 +31,56 @@ Stickman Studio runs inside a sleek, non-blocking **Obsidian-Studio PySide6 UI**
 
 ---
 
+## 🎥 StickMan Videos Showcase (Real Production Demos)
+
+Below are real-world, full-length productions created and rendered end-to-end with **Stickman Studio** (from `D:\StickMan Videos`), showcasing procedural stickman kinematics, semantic prop choreography, kinetic subtitles, and multi-scene pacing:
+
+<table align="center" width="100%">
+  <tr>
+    <td align="center" width="50%">
+      <b>🧠 Overthinking At Midnight</b><br>
+      <i>Neuroscience & Sleep Psychology Explainer</i><br><br>
+      <img src="docs/images/demos/demo1_overthinking_night.gif" width="90%"><br><br>
+      <sub>11:47 PM bedside clock, stickman blinking awake, thought cloud pop & brain diagram</sub>
+    </td>
+    <td align="center" width="50%">
+      <b>🎭 God-Level Manipulation</b><br>
+      <i>Dark Psychology & Manufactured Free Will</i><br><br>
+      <img src="docs/images/demos/demo2_illusion_puppet.gif" width="90%"><br><br>
+      <sub>Marionette puppet strings, cross handles drop & choice architecture stage</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <b>⚠️ The "Martyr" Trap</b><br>
+      <i>Social Dynamics & Inverted Freeze Mode</i><br><br>
+      <img src="docs/images/demos/demo3_martyr_trap.gif" width="90%"><br><br>
+      <sub>Dramatic inversion to dark X-ray canvas with glowing red strings & crown</sub>
+    </td>
+    <td align="center" width="50%">
+      <b>🚩 Why People Remember You</b><br>
+      <i>Viral Relationship Reel & Boundary Clarity</i><br><br>
+      <img src="docs/images/demos/demo4_remember_utility.gif" width="90%"><br><br>
+      <sub>Sequential message notification flurry, phone props & boundary contrast</sub>
+    </td>
+  </tr>
+</table>
+
+### 📊 Featured Video Productions
+
+| Production Title | Topic & Narrative Genre | Format & Runtime | Key Animation & Techniques Demonstrated | Scene Count |
+|---|---|---|---|---|
+| **Why Do People Remember You Only When They Need You?** | Relationship Boundaries & Utility vs. Genuine Connection | `9:16 Vertical Reel` • 125.6s (1080p) | Notification flurry, favor handoff, ghosting timeline, boundary shields, takeaway cards | 16 Scenes |
+| **The Architecture of Manufactured Free Will** | Dark Psychology & Choice Architecture | `9:16 Vertical Reel` • 98.1s (1080p) | Marionette puppet strings, Door A vs. Door B trap, shadow master, ladder climb | 7 Scenes |
+| **Why Your Brain Replays Embarrassing Moments at Night** | Neuroscience & Sleep Psychology | `9:16 Vertical Reel` • 54.8s (1080p) | Bedside clock, thought bubble pop, prefrontal cortex bouncer, megaphone alarm | 7 Scenes |
+| **The "Martyr" Trap: How The Loudest Victim Runs The Room** | Social Dynamics & Guilt Manipulation | `9:16 Vertical Reel` • 45.0s (1080p) | Inverted dark freeze mode, puppet strings, glowing crown, confrontation cards | 5 Scenes |
+| **Why Narcissists Always Have It Worse Than You** | Dark Psychology & Ego Dynamics | `9:16 Vertical Reel` • 113.8s (1080p) | The "One-Up Olympics", wound badges, spotlight shift, psychological supremacy | 13 Scenes |
+| **The Zeigarnik Effect: Open Loop Attraction** | Cognitive Psychology & Mystery | `9:16 Vertical Reel` • 90.9s (1080p) | Unfinished puzzle cards, open loop sparks, closed folder contrast, magnet orbit | 8 Scenes |
+| **The Push-Pull Dynamic in Social Attraction** | Interpersonal Dynamics & Dating Psychology | `9:16 Vertical Reel` • 83.5s (1080p) | Pedestal dynamics, push/pull tension cards, brain sparks, magnetic confidence | 8 Scenes |
+| **Can You Tell If Someone Secretly Likes You?** | Non-Verbal Body Language & Subtle Cues | `9:16 Vertical Reel` • 117.6s (1080p) | Eye gaze triangulation, room focus shifts, posture leaning, subtle cue zooms | 14 Scenes |
+
+---
+
 ## ✨ Key Highlights
 
 | Feature | What It Does |
@@ -227,7 +277,12 @@ Stickman-Studio/
 │       ├── lcm_vs_procedural.png
 │       ├── auto_styles_showcase.png
 │       ├── sample_scene.png
-│       └── styles_grid.png
+│       ├── styles_grid.png
+│       └── demos/                     # Real production GIF video demos from D:\StickMan Videos
+│           ├── demo1_overthinking_night.gif
+│           ├── demo2_illusion_puppet.gif
+│           ├── demo3_martyr_trap.gif
+│           └── demo4_remember_utility.gif
 ├── src/
 │   ├── animation/                     # Moving Stickman kinematics, props, & compositor
 │   │   ├── assets.py                  # Procedural vector props & cache-keyed backgrounds
@@ -259,7 +314,7 @@ Stickman-Studio/
 ├── health_check.bat                   # Diagnostic environment checker
 ├── LICENSE                            # MIT License (Atharv Hatwar)
 ├── main.py                            # Application launch orchestrator
-├── README.md                          # Project documentation
+├── README.md                          # Comprehensive project documentation
 ├── requirements.txt                   # Python dependencies
 ├── run.bat                            # One-click startup script
 └── setup_windows.bat                  # Automated Windows environment installer
