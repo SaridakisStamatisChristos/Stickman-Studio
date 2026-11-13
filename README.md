@@ -28,6 +28,15 @@
   <b>⭐ If you find Stickman Studio useful, please star the repository — it helps more creators discover free, open-source video tools!</b>
 </p>
 
+<p align="center">
+  <a href="https://alternativeto.net/software/stickman-studio/about/?utm_source=badge&utm_medium=referral" target="_blank">
+    <img src="https://alternativeto.net/static/badges/badge-compact-color.svg"
+         alt="Stickman Studio | AlternativeTo"
+         width="244" height="79"
+         style="width: 244px; height: 79px;" />
+  </a>
+</p>
+
 ### ⚖️ Why Stickman Studio? (vs. Cloud Video SaaS)
 
 | Capability | **Stickman Studio (Open Source)** | Commercial SaaS (Vyond / InVideo / Doodly) | Cloud Generative AI (Sora / Runway / Kling) |
