@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://stickmanstudio.netlify.app/"><img src="https://img.shields.io/badge/Website-stickmanstudio.netlify.app-00C7B7.svg?style=for-the-badge&logo=netlify" alt="Official Website"></a>
   <a href="https://github.com/atharv01h"><img src="https://img.shields.io/badge/Creator-Atharv%20Hatwar-7C3AED.svg?style=for-the-badge&logo=github" alt="Creator: Atharv Hatwar"></a>
   <a href="https://github.com/atharv01h/Stickman-Studio/stargazers"><img src="https://img.shields.io/github/stars/atharv01h/Stickman-Studio?style=for-the-badge&logo=github&color=F59E0B" alt="GitHub Stars"></a>
   <a href="https://github.com/atharv01h/Stickman-Studio/network/members"><img src="https://img.shields.io/github/forks/atharv01h/Stickman-Studio?style=for-the-badge&logo=github&color=6366F1" alt="GitHub Forks"></a>
@@ -20,6 +21,7 @@
 # 🎬 Stickman Studio
 
 > **Designed and Engineered by [Atharv Hatwar](https://github.com/atharv01h)**  
+> **Official Website:** **[https://stickmanstudio.netlify.app/](https://stickmanstudio.netlify.app/)**  
 > An autonomous, **100% local, free, offline AI video production suite** for Windows. Turn any topic or narration script into a dynamic, voiced, full-screen animated reel or explainer film — **Moving Stickman** or **Cinematic Illustrated Reels** — with zero paid APIs, zero subscriptions, and full privacy.
 
 <p align="center">
@@ -296,6 +298,7 @@ Stickman-Studio/
 ├── docs/                              # Visual documentation & media assets
 │   └── images/                        # Banner, UI screenshots & rendered feature showcases
 │       ├── banner.png
+│       ├── app_icon_512.png           # Official 512x512 app icon & logo
 │       ├── social_preview.png         # GitHub 1280x640 OpenGraph social preview card
 │       ├── ui_studio.png
 │       ├── cis_choreographies_showcase.png
