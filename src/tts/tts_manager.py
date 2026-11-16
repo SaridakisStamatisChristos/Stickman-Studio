@@ -8,6 +8,7 @@ installed models/engines.
 
 from __future__ import annotations
 
+import array
 import importlib.util
 import json
 import logging
@@ -28,6 +29,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 KOKORO_VOICE_CATALOG: list[dict] = [
+    # ── Hyper-Realistic Human Blend Profiles (Atharv Hatwar) ────────────
+    {"id": "blend:female_warm", "name": "Maya (Female, Warm Empathy Blend)", "gender": "female", "personality": "natural", "language": "en", "lang_code": "en-us", "backend": "kokoro", "tags": ["US English", "Human Blend", "Warmth & Breath", "Dialogue"]},
+    {"id": "blend:male_introspective", "name": "Alex (Male, Introspective Deep Blend)", "gender": "male", "personality": "deep", "language": "en", "lang_code": "en-us", "backend": "kokoro", "tags": ["US English", "Human Blend", "Chest Resonance", "Dialogue"]},
+    {"id": "blend:female_calm", "name": "Sarah (Female, Soft & Intimate Blend)", "gender": "female", "personality": "calm", "language": "en", "lang_code": "en-us", "backend": "kokoro", "tags": ["US English", "Human Blend", "Soft Calm", "Kokoro"]},
+    {"id": "blend:male_story", "name": "David (Male, Dark Psychology & Gravitas)", "gender": "male", "personality": "deep", "language": "en", "lang_code": "en-us", "backend": "kokoro", "tags": ["US English", "Human Blend", "Dark Psychology", "Gravitas"]},
     # ── American English Female (11) ─────────────────────────────────────
     {"id": "af_heart",    "name": "Heart (Female, Natural)",       "gender": "female", "personality": "natural",   "language": "en", "lang_code": "en-us", "backend": "kokoro", "tags": ["US English", "Natural", "Kokoro"]},
     {"id": "af_bella",    "name": "Bella (Female, Calm)",          "gender": "female", "personality": "calm",      "language": "en", "lang_code": "en-us", "backend": "kokoro", "tags": ["US English", "Calm", "Kokoro"]},
@@ -104,7 +110,11 @@ class TTSManager:
 
     def __init__(self, models_dir: str, ffmpeg_path: str = "ffmpeg") -> None:
         self.models_dir: str = models_dir
-        self.ffmpeg_path: str = ffmpeg_path
+        if ffmpeg_path == "ffmpeg" and not shutil.which("ffmpeg"):
+            candidate = r"C:\ffmpeg\bin\ffmpeg.exe"
+            self.ffmpeg_path = candidate if os.path.exists(candidate) else "ffmpeg"
+        else:
+            self.ffmpeg_path = ffmpeg_path
         os.makedirs(models_dir, exist_ok=True)
         os.makedirs(os.path.join(models_dir, "kokoro"), exist_ok=True)
         os.makedirs(os.path.join(models_dir, "piper"), exist_ok=True)
@@ -118,13 +128,17 @@ class TTSManager:
 
     def _find_kokoro_files(self) -> tuple[Optional[str], Optional[str]]:
         """Locate kokoro ONNX model + voices bin in models_dir or project assets."""
+        repo_root = Path(__file__).resolve().parent.parent.parent
         search_dirs = [
             Path(self.models_dir) / "kokoro",
             Path(self.models_dir),
+            repo_root / "models" / "kokoro",
+            repo_root / "assets" / "voices" / "kokoro",
             Path("assets/voices/kokoro"),
             Path("models/kokoro"),
+            Path(r"D:\StickMan video software\models\kokoro"),
         ]
-        model_names = ("kokoro-v1.0.int8.onnx", "kokoro-v1.0.onnx", "kokoro-v1.0.fp16.onnx", "kokoro-v0_19.onnx")
+        model_names = ("kokoro-v1.0.fp16.onnx", "kokoro-v1.0.int8.onnx", "kokoro-v1.0.onnx", "kokoro-v0_19.onnx")
         voice_names = ("voices-v1.0.bin", "voices.bin", "voices.json")
 
         found_model: Optional[str] = None
@@ -274,7 +288,17 @@ foreach ($v in $s.GetInstalledVoices()) {
             supported_kokoro = self._get_installed_kokoro_voice_ids()
             known_ids = {v["id"] for v in KOKORO_VOICE_CATALOG}
             for v in KOKORO_VOICE_CATALOG:
-                if supported_kokoro is None or v["id"] in supported_kokoro:
+                is_blend = str(v["id"]).startswith("blend:")
+                blend_ok = True
+                if is_blend and supported_kokoro:
+                    blend_spec = v.get("blend", [])
+                    blend_ok = all(vid in supported_kokoro for vid, _ in blend_spec)
+
+                if is_blend and blend_ok:
+                    entry = dict(v)
+                    entry["available"] = True
+                    voices.append(entry)
+                elif supported_kokoro is None or v["id"] in supported_kokoro:
                     entry = dict(v)
                     entry["available"] = True
                     voices.append(entry)
@@ -406,7 +430,8 @@ foreach ($v in $s.GetInstalledVoices()) {
         cleaned = re.sub(r"\b(\d+)x\b", r"\1 times", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"\b(\d+)\+\b", r"\1 plus", cleaned)
 
-        # 4. Dashes and slashes between words
+        # 4. Dashes, slashes, and ellipses between words (prevent awkward dead-stop freezes)
+        cleaned = re.sub(r"\s*\.\.\.+\s*", ", ", cleaned)
         cleaned = cleaned.replace("—", ", ").replace("–", ", ")
         cleaned = re.sub(r"([a-zA-Z]+)/([a-zA-Z]+)", r"\1 or \2", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
@@ -470,7 +495,10 @@ foreach ($v in $s.GetInstalledVoices()) {
             if success and abs(pitch) >= 0.1:
                 if raw_path != output_path and os.path.exists(raw_path):
                     shutil.move(raw_path, output_path)
-                return output_path if os.path.exists(output_path) else None
+                if os.path.exists(output_path):
+                    self.trim_silence(output_path, output_path, head_pad=0.030, tail_pad=0.060)
+                    return output_path
+                return None
 
         if not success:
             logger.info("Primary TTS backend '%s' failed; using Windows SAPI fallback", backend)
@@ -478,6 +506,8 @@ foreach ($v in $s.GetInstalledVoices()) {
             success = self._synthesize_sapi(prepared, raw_path, speed=speed, pitch=pitch, sapi_voice_name=sapi_name)
             if success and raw_path != output_path:
                 shutil.move(raw_path, output_path)
+            if success and os.path.exists(output_path):
+                self.trim_silence(output_path, output_path, head_pad=0.030, tail_pad=0.060)
                 return output_path
 
         if not success or not os.path.exists(raw_path):
@@ -494,7 +524,10 @@ foreach ($v in $s.GetInstalledVoices()) {
                 except OSError:
                     pass
 
-        return output_path if os.path.exists(output_path) else None
+        if os.path.exists(output_path):
+            self.trim_silence(output_path, output_path, head_pad=0.030, tail_pad=0.060)
+            return output_path
+        return None
 
     def synthesize_sentences(
         self,
@@ -545,6 +578,86 @@ foreach ($v in $s.GetInstalledVoices()) {
     # Backend implementations
     # ------------------------------------------------------------------
 
+    def _init_kokoro(self, model_path: str, voices_path: str):
+        """Initialize Kokoro instance with dynamic tensor names & speed-type compatibility."""
+        if self._kokoro_onnx is None:
+            try:
+                import numpy as np
+                import onnxruntime as ort
+                from kokoro_onnx import Kokoro  # type: ignore
+
+                ort.set_default_logger_severity(3)
+                kokoro_inst = Kokoro(model_path, voices_path)
+
+                sess_inputs = {inp.name: inp for inp in kokoro_inst.sess.get_inputs()}
+                token_key = "tokens" if "tokens" in sess_inputs else "input_ids"
+                speed_info = sess_inputs.get("speed")
+                speed_is_int = speed_info is not None and "int" in speed_info.type.lower()
+
+                def _dynamic_create_audio(phonemes: str, voice, speed: float = 1.0):
+                    tokens = np.array(kokoro_inst.tokenizer.tokenize(phonemes[:510]), dtype=np.int64)
+                    v = voice[len(tokens)]
+                    t_in = [[0, *tokens, 0]]
+                    sp = (
+                        np.array([int(round(speed))], dtype=np.int32)
+                        if speed_is_int
+                        else np.array([float(speed)], dtype=np.float32)
+                    )
+                    inputs = {
+                        token_key: t_in,
+                        "style": np.array(v, dtype=np.float32),
+                        "speed": sp,
+                    }
+                    return kokoro_inst.sess.run(None, inputs)[0], 24000
+
+                kokoro_inst._create_audio = _dynamic_create_audio
+                self._kokoro_onnx = kokoro_inst
+            except Exception as exc:
+                logger.error("Failed to initialize kokoro_onnx: %s", exc)
+                return None
+        return self._kokoro_onnx
+
+    def _resolve_kokoro_voice_style(self, kokoro_inst, voice_id: str):
+        """
+        Resolve voice id into a voice style tensor.
+        Supports hyper-realistic human blend profiles and custom combinations.
+        """
+        import numpy as np
+
+        blend_presets = {
+            "blend:female_warm": [("af_heart", 0.70), ("af_sarah", 0.30)],
+            "blend:male_introspective": [("am_michael", 0.75), ("am_adam", 0.25)],
+            "blend:female_calm": [("af_bella", 0.65), ("af_nicole", 0.35)],
+            "blend:male_story": [("am_fenrir", 0.70), ("am_onyx", 0.30)],
+        }
+        if voice_id in blend_presets:
+            style = sum(
+                w * kokoro_inst.get_voice_style(vid)
+                for vid, w in blend_presets[voice_id]
+            )
+            return style
+
+        if "+" in str(voice_id):
+            try:
+                parts = str(voice_id).split("+")
+                components = []
+                for p in parts:
+                    p = p.strip()
+                    if ":" in p:
+                        vid, w = p.split(":", 1)
+                        components.append((vid.strip(), float(w.strip() or 1.0)))
+                    else:
+                        components.append((p, 1.0))
+                total_w = sum(w for _, w in components) or 1.0
+                return sum((w / total_w) * kokoro_inst.get_voice_style(v) for v, w in components)
+            except Exception as exc:
+                logger.warning("Custom blend parse error for '%s': %s", voice_id, exc)
+
+        try:
+            return kokoro_inst.get_voice_style(voice_id)
+        except Exception:
+            return voice_id
+
     def _synthesize_kokoro(
         self,
         text: str,
@@ -553,26 +666,30 @@ foreach ($v in $s.GetInstalledVoices()) {
         output_path: str,
         lang_code: str = "en-us",
     ) -> bool:
-        """Synthesize via lightweight kokoro-onnx (preferred) or kokoro."""
+        """Synthesize via lightweight kokoro-onnx with hyper-realistic human voice styling."""
         model_path, voices_path = self._find_kokoro_files()
         if model_path and voices_path and importlib.util.find_spec("kokoro_onnx") is not None:
             try:
                 import numpy as np
-                from kokoro_onnx import Kokoro  # type: ignore
 
-                if self._kokoro_onnx is None:
-                    self._kokoro_onnx = Kokoro(model_path, voices_path)
-
-                samples, sample_rate = self._kokoro_onnx.create(
-                    text, voice=voice_id, speed=max(0.5, min(2.0, speed)), lang=lang_code
-                )
-                pcm = (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16)
-                with wave.open(output_path, "wb") as wf:
-                    wf.setnchannels(1)
-                    wf.setsampwidth(2)
-                    wf.setframerate(int(sample_rate))
-                    wf.writeframes(pcm.tobytes())
-                return os.path.exists(output_path)
+                k = self._init_kokoro(model_path, voices_path)
+                if k is not None:
+                    resolved_style = self._resolve_kokoro_voice_style(k, voice_id)
+                    # Natural conversational cadence multiplier (calibrates Kokoro audiobook base to lively dialogue)
+                    eff_kokoro_speed = max(0.5, min(2.0, float(speed) * 1.10))
+                    samples, sample_rate = k.create(
+                        text,
+                        voice=resolved_style,
+                        speed=eff_kokoro_speed,
+                        lang=lang_code,
+                    )
+                    pcm = (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16)
+                    with wave.open(output_path, "wb") as wf:
+                        wf.setnchannels(1)
+                        wf.setsampwidth(2)
+                        wf.setframerate(int(sample_rate))
+                        wf.writeframes(pcm.tobytes())
+                    return os.path.exists(output_path)
             except Exception as exc:
                 logger.error("kokoro-onnx synthesis error: %s", exc)
 
@@ -713,6 +830,76 @@ $synth.Dispose()
     # Utility
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def trim_silence(
+        input_path: str,
+        output_path: str,
+        head_pad: float = 0.030,
+        tail_pad: float = 0.060,
+        threshold: int = 350,
+    ) -> float:
+        """
+        Trim leading and trailing dead silence from 16-bit mono WAV,
+        leaving crisp 30ms headroom and 60ms natural vocal decay.
+        Returns final audio duration in seconds.
+        """
+        if not input_path or not os.path.exists(input_path):
+            return 0.0
+        try:
+            with wave.open(input_path, "rb") as wf:
+                sr = wf.getframerate()
+                n_ch = wf.getnchannels()
+                sw = wf.getsampwidth()
+                n_frames = wf.getnframes()
+                raw = wf.readframes(n_frames)
+
+            if n_ch != 1 or sw != 2 or n_frames == 0 or sr <= 0:
+                if input_path != output_path:
+                    shutil.copy2(input_path, output_path)
+                return n_frames / float(sr) if sr > 0 else 0.0
+
+            samples = array.array("h")
+            samples.frombytes(raw)
+
+            # Find first non-silent sample
+            start_idx = 0
+            for idx, s in enumerate(samples):
+                if abs(s) >= threshold:
+                    start_idx = idx
+                    break
+
+            # Find last non-silent sample
+            end_idx = n_frames - 1
+            for idx in range(n_frames - 1, -1, -1):
+                if abs(samples[idx]) >= threshold:
+                    end_idx = idx
+                    break
+
+            if start_idx >= end_idx:
+                if input_path != output_path:
+                    shutil.copy2(input_path, output_path)
+                return n_frames / float(sr)
+
+            head_samples = int(head_pad * sr)
+            tail_samples = int(tail_pad * sr)
+
+            final_start = max(0, start_idx - head_samples)
+            final_end = min(n_frames, end_idx + 1 + tail_samples)
+
+            trimmed = samples[final_start:final_end]
+            with wave.open(output_path, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(sr)
+                wf.writeframes(trimmed.tobytes())
+
+            return len(trimmed) / float(sr)
+        except Exception as exc:
+            logger.warning("trim_silence failed on '%s': %s", input_path, exc)
+            if input_path != output_path and os.path.exists(input_path):
+                shutil.copy2(input_path, output_path)
+            return 0.0
+
     def get_audio_duration(self, path: Optional[str]) -> float:
         """Return duration of a WAV file in seconds. Returns 0.0 on error."""
         if not path or not os.path.exists(path):
@@ -725,6 +912,333 @@ $synth.Dispose()
         except Exception as exc:
             logger.error("Could not read WAV duration for '%s': %s", path, exc)
             return 0.0
+
+    # ------------------------------------------------------------------
+    # Broadcast-Grade Acoustic Mastering & Dialogue Engine (Atharv Hatwar)
+    # ------------------------------------------------------------------
+
+    def apply_acoustic_mastering(self, input_wav: str, output_wav: str) -> bool:
+        """
+        Applies warm broadcast-grade human mastering chain:
+          - Highpass at 65Hz (removes sub-bass mud & mic pops)
+          - Warm chest resonance at 220Hz (+1.5 dB)
+          - De-harshing dip at 3.2 kHz (-1.0 dB)
+          - Gentle vocal air lift at 11 kHz (+1.2 dB)
+          - Transparent optical compressor (ratio 2.0:1)
+        """
+        if not input_wav or not os.path.exists(input_wav):
+            return False
+
+        af_filter = (
+            "highpass=f=65,"
+            "equalizer=f=220:t=q:w=1.2:g=1.5,"
+            "equalizer=f=3200:t=q:w=1.5:g=-1.0,"
+            "equalizer=f=11000:t=q:w=1.0:g=1.2,"
+            "acompressor=threshold=-16dB:ratio=2.0:attack=15:release=120"
+        )
+        is_same = os.path.abspath(input_wav) == os.path.abspath(output_wav)
+        tmp_out = f"{output_wav}.master.tmp.wav" if is_same else output_wav
+
+        cmd = [
+            self.ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error",
+            "-i", input_wav,
+            "-af", af_filter,
+            "-ar", "24000",
+            "-ac", "1",
+            tmp_out,
+        ]
+        try:
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                timeout=45,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if res.returncode == 0 and os.path.exists(tmp_out):
+                if is_same:
+                    shutil.move(tmp_out, output_wav)
+                return True
+        except Exception as exc:
+            logger.warning("Acoustic mastering exception: %s", exc)
+
+        if is_same and os.path.exists(tmp_out):
+            try:
+                os.unlink(tmp_out)
+            except OSError:
+                pass
+        return False
+
+    @staticmethod
+    @staticmethod
+    def parse_dialogue_script(
+        text: str,
+        name1: str = "Alex",
+        name2: str = "Maya",
+    ) -> list[dict]:
+        """
+        Parse raw script into structured dialogue turns using ScriptIntelligenceEngine.
+        Robustly supports:
+          - '**MALE VOICE:**' / '**FEMALE VOICE:**' (inline or on separate lines)
+          - 'Alex:' / 'Maya:' / '**Alex:**' / '**Maya:**' / '[Alex]' / '[Maya]'
+          - 'Speaker 1:' / 'Speaker 2:' / 'Voice 1:' / 'Voice 2:' / 'Male:' / 'Female:'
+          - Strips document titles, metadata lines (Duration, Genre, Voices),
+            scene headers (### SCENE 1...), stage directions ((SLOW AND EMOTIONAL)),
+            and end screens.
+          - Never includes speaker names in the spoken dialogue text.
+        """
+        if not text or not str(text).strip():
+            return []
+
+        try:
+            from engine.script_intelligence import ScriptIntelligenceEngine
+            beats = ScriptIntelligenceEngine.parse_script_to_story_beats(text, name1=name1, name2=name2)
+            if beats:
+                return [
+                    {
+                        "speaker": b["speaker"],
+                        "speaker_name": b["speaker_name"],
+                        "text": b["narration"],
+                    }
+                    for b in beats
+                ]
+        except Exception as exc:
+            logger.warning("ScriptIntelligenceEngine parse exception: %s; using regex fallback", exc)
+
+        n1 = re.escape((name1 or "Alex").strip().lower())
+        n2 = re.escape((name2 or "Maya").strip().lower())
+
+        spk_tag = re.compile(
+            rf"^\s*(?:\*\*)?(?:\[)?(male\s*voice|female\s*voice|male|female|speaker\s*1|speaker\s*2|voice\s*1|voice\s*2|{n1}|{n2}|final\s*line\s*[-–—]\s*(?:female|male)\s*voice)(?:\])?(?:\s*\([^)]*\))?(?:\*\*)?\s*[:\-–—]\s*(.*)$",
+            re.IGNORECASE,
+        )
+        meta_tag = re.compile(
+            r"^\s*(?:#+\s*|\*\*)?(?:duration|genre|voices|target|resolution|fps|aspect|end\s*screen|final\s*screen)\s*[:\-–—].*$",
+            re.IGNORECASE,
+        )
+        scene_header = re.compile(
+            r"^\s*#+\s*(?:\[?[a-z0-9\s–—|]+\]?|scene\s*\d+|hook|story|psychology|realisation|realization|twist|punchline|outro|intro|conclusion|takeaway).*$",
+            re.IGNORECASE,
+        )
+
+        lines = str(text).splitlines()
+        has_tags = any(spk_tag.match(l.strip()) for l in lines if l.strip())
+
+        turns: list[dict] = []
+        curr_speaker: Optional[int] = None
+        curr_text: list[str] = []
+
+        if has_tags:
+            for line in lines:
+                sline = line.strip()
+                if not sline:
+                    continue
+                # Skip markdown headers without dialogue
+                if sline.startswith("#") and not spk_tag.match(sline):
+                    continue
+                # Skip metadata lines (Duration: 2 Minutes, Genre: ...)
+                if meta_tag.match(sline):
+                    continue
+                # Skip end cards
+                if re.match(r"^['\"]?Read that again\.?.*?['\"]?$", sline, re.IGNORECASE):
+                    continue
+
+                m = spk_tag.match(sline)
+                if m:
+                    # Flush previous turn
+                    if curr_speaker is not None and curr_text:
+                        spoken = " ".join(curr_text).strip()
+                        spoken = re.sub(r"\([A-Z\s]{4,}\)", "", spoken).strip()
+                        spoken = re.sub(r"[*_]+", "", spoken).strip()
+                        if spoken:
+                            turns.append({
+                                "speaker": curr_speaker,
+                                "speaker_name": name1 if curr_speaker == 1 else name2,
+                                "text": spoken,
+                            })
+                    raw_tag = re.sub(r"[*_\[\]]", "", m.group(1)).lower()
+                    inline_text = m.group(2).strip() if m.group(2) else ""
+                    inline_text = re.sub(r"^[*_\s]+", "", inline_text)
+                    inline_text = re.sub(r"[*_]+", "", inline_text)
+                    is_s2 = any(k in raw_tag for k in ("female", "speaker 2", "voice 2", (name2 or "maya").lower()))
+                    curr_speaker = 2 if is_s2 else 1
+                    curr_text = [inline_text] if inline_text else []
+                else:
+                    if curr_speaker is not None:
+                        cleaned = re.sub(r"\([A-Z\s]{4,}\)", "", sline).strip()
+                        cleaned = re.sub(r"[*_]+", "", cleaned).strip()
+                        if cleaned:
+                            curr_text.append(cleaned)
+                    else:
+                        # Fallback leading line before first tag
+                        curr_speaker = 1
+                        curr_text.append(re.sub(r"[*_]+", "", sline).strip())
+
+            if curr_speaker is not None and curr_text:
+                spoken = " ".join(curr_text).strip()
+                spoken = re.sub(r"\([A-Z\s]{4,}\)", "", spoken).strip()
+                spoken = re.sub(r"[*_]+", "", spoken).strip()
+                if spoken:
+                    turns.append({
+                        "speaker": curr_speaker,
+                        "speaker_name": name1 if curr_speaker == 1 else name2,
+                        "text": spoken,
+                    })
+        else:
+            # Alternating clean conversational sentences
+            # Clean metadata and headers first
+            clean_lines = []
+            for l in lines:
+                s = l.strip()
+                if not s or s.startswith("#") or meta_tag.match(s) or re.match(r"^['\"]?Read that again", s, re.IGNORECASE):
+                    continue
+                clean_lines.append(s)
+
+            full_clean = " ".join(clean_lines)
+            raw_sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", full_clean) if s.strip()]
+            current_speaker = 1
+            for s in raw_sentences:
+                cleaned = re.sub(r"[*_]+", "", s).strip()
+                if not cleaned:
+                    continue
+                turns.append({
+                    "speaker": current_speaker,
+                    "speaker_name": name1 if current_speaker == 1 else name2,
+                    "text": cleaned,
+                })
+                current_speaker = 2 if current_speaker == 1 else 1
+
+        return turns
+
+    def synthesize_dialogue(
+        self,
+        script: Any,
+        voice1_cfg: dict,
+        voice2_cfg: dict,
+        output_path: str,
+        name1: str = "Alex",
+        name2: str = "Maya",
+        master_audio: bool = True,
+        progress_cb: Optional[Callable[[str, int], None]] = None,
+    ) -> dict:
+        """
+        Synthesize multi-turn dialogue between Speaker 1 and Speaker 2.
+        Seamlessly stitches turns with conversational pacing micro-gaps and masters the final track.
+        """
+        if isinstance(script, list):
+            turns = script
+        else:
+            turns = self.parse_dialogue_script(str(script), name1=name1, name2=name2)
+
+        if not turns:
+            turns = [{"speaker": 1, "speaker_name": name1, "text": str(script).strip()}]
+
+        work_dir = Path(tempfile.mkdtemp(prefix="dialogue_tts_"))
+        sr = 24000
+        combined_pcm_chunks: list[bytes] = []
+        global_time = 0.15
+
+        # Initial silence padding
+        initial_samples = int(global_time * sr)
+        if initial_samples > 0:
+            combined_pcm_chunks.append(b"\x00" * (initial_samples * 2))
+
+        timed_turns: list[dict] = []
+        total_turns = len(turns)
+
+        try:
+            for idx, turn in enumerate(turns):
+                if progress_cb:
+                    progress_cb(f"Synthesizing {turn['speaker_name']}…", int(10 + (idx / total_turns) * 75))
+
+                is_s1 = turn["speaker"] == 1
+                cfg = voice1_cfg if is_s1 else voice2_cfg
+                vid = cfg.get("voice_id") or ("blend:male_introspective" if is_s1 else "blend:female_warm")
+                spd = float(cfg.get("speed", 1.0))
+                pit = float(cfg.get("pitch", 0.0))
+
+                clean_line = re.sub(
+                    rf"^(?:\*\*)?(?:\[)?(?:{re.escape(name1)}|{re.escape(name2)}|speaker\s*1|speaker\s*2|voice\s*1|voice\s*2|male\s*voice|female\s*voice|male|female)(?:\])?(?:\*\*)?\s*[:\-–—]\s*",
+                    "",
+                    str(turn["text"]).strip(),
+                    flags=re.IGNORECASE,
+                ).strip()
+                clean_line = re.sub(r"[*_]+", "", clean_line).strip()
+                if not clean_line:
+                    continue
+
+                turn_wav = str(work_dir / f"turn_{idx:03d}_{turn['speaker_name']}.wav")
+                ok = self.synthesize(
+                    text=clean_line,
+                    voice_id=vid,
+                    speed=spd,
+                    pitch=pit,
+                    output_path=turn_wav,
+                )
+
+                turn_dur = self.get_audio_duration(turn_wav) if (ok and os.path.exists(turn_wav)) else self.estimate_duration(clean_line, spd)
+
+                # Read raw PCM from turn_wav
+                if ok and os.path.exists(turn_wav):
+                    with wave.open(turn_wav, "rb") as wf:
+                        chunk_rate = wf.getframerate()
+                        chunk_frames = wf.readframes(wf.getnframes())
+                        combined_pcm_chunks.append(chunk_frames)
+                else:
+                    silent_len = int(turn_dur * sr) * 2
+                    combined_pcm_chunks.append(b"\x00" * silent_len)
+
+                timed_turns.append({
+                    "turn_index": idx,
+                    "speaker": turn["speaker"],
+                    "speaker_name": turn["speaker_name"],
+                    "text": clean_line,
+                    "start": round(global_time, 3),
+                    "end": round(global_time + turn_dur, 3),
+                    "duration": round(turn_dur, 3),
+                })
+                global_time += turn_dur
+
+                # Conversational natural turn-taking micro-gap (crisp and lively)
+                gap_sec = 0.22 if idx < total_turns - 1 else 0.15
+                gap_samples = int(gap_sec * sr)
+                combined_pcm_chunks.append(b"\x00" * (gap_samples * 2))
+                global_time += gap_sec
+
+            # Write raw concatenated dialogue WAV
+            raw_path = f"{output_path}.raw.wav" if master_audio else output_path
+            os.makedirs(os.path.dirname(os.path.abspath(raw_path)), exist_ok=True)
+            with wave.open(raw_path, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(sr)
+                for chunk in combined_pcm_chunks:
+                    wf.writeframes(chunk)
+
+            final_dur = self.get_audio_duration(raw_path)
+
+            if master_audio:
+                if progress_cb:
+                    progress_cb("Applying human acoustic studio mastering…", 92)
+                if self.apply_acoustic_mastering(raw_path, output_path):
+                    try:
+                        os.unlink(raw_path)
+                    except OSError:
+                        pass
+                else:
+                    if raw_path != output_path:
+                        shutil.move(raw_path, output_path)
+
+            total_dur = self.get_audio_duration(output_path) or final_dur
+            return {
+                "success": True,
+                "output_path": output_path,
+                "duration": total_dur,
+                "turns": timed_turns,
+                "speaker1_name": name1,
+                "speaker2_name": name2,
+            }
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def compute_auto_voice_speed(
@@ -741,10 +1255,10 @@ def compute_auto_voice_speed(
         return 1.0
 
     profile_base = {
-        "psychology": 0.96,
-        "story_wisdom": 0.97,
-        "growth_discipline": 1.04,
-        "social_contrast": 1.03,
+        "psychology": 1.0,
+        "story_wisdom": 1.0,
+        "growth_discipline": 1.08,
+        "social_contrast": 1.06,
     }.get(video_profile, 1.0)
 
     sentence_stops = len(re.findall(r"[.!?]+", script))
@@ -753,9 +1267,9 @@ def compute_auto_voice_speed(
 
     if target_duration > 4.0:
         ratio = est_base_dur / float(target_duration)
-        clamped_ratio = max(0.88, min(1.22, ratio))
+        clamped_ratio = max(1.0, min(1.28, ratio))
         blended = (0.65 * clamped_ratio) + (0.35 * profile_base)
     else:
         blended = profile_base
 
-    return round(max(0.88, min(1.22, blended)), 2)
+    return round(max(1.0, min(1.28, blended)), 2)

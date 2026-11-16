@@ -109,7 +109,7 @@ _WORDS_PER_SECOND = 2.4
 
 
 def _clean_script_text(raw: str) -> str:
-    """Strip markdown, stage brackets, speaker prefixes, and excess whitespace."""
+    """Strip markdown, stage brackets, speaker prefixes, metadata lines, and excess whitespace."""
     if not raw:
         return ""
     text = raw.strip()
@@ -117,13 +117,34 @@ def _clean_script_text(raw: str) -> str:
     text = re.sub(r"\s*```$", "", text)
     # Remove [stage directions] or (Pause) cues
     text = re.sub(r"\[[^\]]*\]", " ", text)
-    text = re.sub(r"\((?:pause|sfx|music|scene|beat)[^)]*\)", " ", text, flags=re.IGNORECASE)
-    # Remove "Narrator:" / "Host:" / "Scene 1:" prefixes per line
+    text = re.sub(r"\((?:pause|sfx|music|scene|beat|slow and emotional)[^)]*\)", " ", text, flags=re.IGNORECASE)
+
+    meta_tag = re.compile(
+        r"^\s*(?:#+\s*|\*\*)?(?:duration|genre|voices|target|resolution|fps|aspect|end\s*screen|final\s*screen)\s*[:\-–—].*$",
+        re.IGNORECASE,
+    )
     cleaned_lines: list[str] = []
     for line in text.splitlines():
-        line = re.sub(r"^\s*(?:narrator|host|speaker|voiceover|scene\s*\d+)\s*:\s*", "", line, flags=re.IGNORECASE)
-        line = re.sub(r"^\s*[-*•]\s+", "", line)
         line = line.strip()
+        if not line:
+            continue
+        # Skip markdown titles like # TITLE
+        if line.startswith("#") and len(line.split()) <= 14 and not any(k in line.lower() for k in ("alex:", "maya:", "voice:", "scene:")):
+            continue
+        if meta_tag.match(line):
+            continue
+        if re.match(r"^['\"]?Read that again\.?.*?['\"]?$", line, re.IGNORECASE):
+            continue
+
+        # Remove "Narrator:" / "Host:" / "Male Voice:" / "Female Voice:" / "Alex:" / "Maya:" prefixes
+        line = re.sub(
+            r"^\s*(?:\*\*)?(?:narrator|host|speaker\s*\d*|voiceover|scene\s*\d+|male\s*voice|female\s*voice|male|female|alex|maya)(?:\*\*)?\s*[:\-–—]\s*",
+            "",
+            line,
+            flags=re.IGNORECASE,
+        )
+        line = re.sub(r"^\s*[-*•]\s+", "", line)
+        line = re.sub(r"[*_]+", "", line).strip()
         if line:
             cleaned_lines.append(line)
     out = re.sub(r"\s+", " ", " ".join(cleaned_lines)).strip()
@@ -180,7 +201,26 @@ class ScenePlanner:
         except Exception as exc:
             logger.warning("ScenePlanner.plan_scenes LLM path failed: %s", exc)
 
-        logger.info("ScenePlanner: using intelligent semantic template planner (%s)", pack.id)
+        logger.info("ScenePlanner: using intelligent semantic story planner (%s)", pack.id)
+        try:
+            from engine.script_intelligence import ScriptIntelligenceEngine
+            beats = ScriptIntelligenceEngine.parse_script_to_story_beats(script)
+            if len(beats) >= 2:
+                sec_per_beat = max(1.5, duration / float(len(beats)))
+                planned_scenes: list[dict] = []
+                for b_idx, beat in enumerate(beats):
+                    sc = ScriptIntelligenceEngine.plan_visual_for_beat(
+                        beat=beat,
+                        context_history=planned_scenes,
+                        duration=sec_per_beat,
+                    )
+                    sc["id"] = b_idx + 1
+                    planned_scenes.append(normalize_scene_for_composer(sc, style_id=pack.id))
+                from engine.smart_video_director import SmartVideoDirector
+                return SmartVideoDirector.direct_storyboard(planned_scenes)
+        except Exception as exc:
+            logger.warning("ScenePlanner ScriptIntelligenceEngine path note: %s", exc)
+
         fallback_scenes = self._create_fallback_scenes(script, duration, topic=topic, style_id=pack.id)
         from engine.smart_video_director import SmartVideoDirector
         return SmartVideoDirector.direct_storyboard(fallback_scenes)
@@ -248,10 +288,28 @@ class ScenePlanner:
         topic: str = "",
         style: str = "a1_classic_bw",
         duration: int = 30,
+        dialogue_mode: bool = False,
+        name1: str = "Alex",
+        name2: str = "Maya",
+        address_by_name: bool = True,
     ) -> str:
         """Enhance *script* clarity, hook punch, and rhythm for TTS while preserving meaning."""
         if not script.strip():
             return script
+
+        if dialogue_mode:
+            try:
+                from engine.inbuilt_ai_director import InbuiltAIDirector
+                return InbuiltAIDirector.improve_script(
+                    script=script,
+                    target_duration=duration,
+                    dialogue_mode=True,
+                    name1=name1,
+                    name2=name2,
+                    address_by_name=address_by_name,
+                )
+            except Exception as exc:
+                logger.warning("InbuiltAIDirector improve dialogue error: %s", exc)
 
         pack, _sp = resolve_style_pack(style)
         target_words = max(18, int(duration * _WORDS_PER_SECOND))
@@ -288,12 +346,32 @@ class ScenePlanner:
         topic: str,
         duration: int = 30,
         style: str = "a1_classic_bw",
+        dialogue_mode: bool = False,
+        name1: str = "Alex",
+        name2: str = "Maya",
+        address_by_name: bool = True,
     ) -> str:
         """Generate a duration-paced, style-toned narration script from *topic*."""
         pack, _sp = resolve_style_pack(style)
-        word_count = max(20, int(duration * _WORDS_PER_SECOND))
         clean_topic = (topic or "human behavior").strip()
 
+        # If dialogue mode requested, route directly to high-speed Inbuilt AI Director
+        if dialogue_mode:
+            try:
+                from engine.inbuilt_ai_director import InbuiltAIDirector
+                return InbuiltAIDirector.generate_script(
+                    topic=clean_topic,
+                    duration=duration,
+                    dialogue_mode=True,
+                    name1=name1,
+                    name2=name2,
+                    address_by_name=address_by_name,
+                    style=style,
+                )
+            except Exception as exc:
+                logger.warning("InbuiltAIDirector dialogue generation error: %s", exc)
+
+        word_count = max(20, int(duration * _WORDS_PER_SECOND))
         prompt = textwrap.dedent(f"""
             Write an engaging spoken narration script for a {duration}-second stickman animation.
             Topic: {clean_topic}
@@ -316,7 +394,17 @@ class ScenePlanner:
         except Exception as exc:
             logger.warning("generate_script LLM failed: %s", exc)
 
-        return self._generate_offline_script(clean_topic, duration=duration, pack=pack)
+        # High-intelligence in-process fallback
+        try:
+            from engine.inbuilt_ai_director import InbuiltAIDirector
+            return InbuiltAIDirector.generate_script(
+                topic=clean_topic,
+                duration=duration,
+                dialogue_mode=False,
+                style=style,
+            )
+        except Exception:
+            return self._generate_offline_script(clean_topic, duration=duration, pack=pack)
 
     # ------------------------------------------------------------------
     # Offline Domain & Style-Tailored Script Engine

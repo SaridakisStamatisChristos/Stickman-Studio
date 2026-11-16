@@ -23,6 +23,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from .assets import AssetLibrary, _hex_to_rgba, _is_dark_hex, _load_ui_font
 from .stickman import POSE_SEQUENCES, StickmanRenderer
 from engine.scene_templates import normalize_scene_for_composer
+from engine.text_sanitizer import VisualTextSanitizer
 from styles.style_packs import (
     resolve_style_pack,
     get_adaptive_style_for_scene,
@@ -215,7 +216,9 @@ class SceneComposer:
                 else:
                     emo = base_emo
 
-                acc = char.get("accessory")
+                is_fem = bool(char.get("gender") == "female" or str(char.get("name", "")).lower() in ("maya", "female") or char.get("id") == "person_b")
+                acc = char.get("accessory") or ("ponytail" if is_fem else None)
+                eff_outfit = char.get("outfit") or ("feminine_silhouette" if is_fem else None)
                 talk = bool(char.get("speaking", idx_c == 0 and len(characters) == 1))
 
                 # Gaze tracking: Partner's head in dialogue, or focal prop center in solitary scenes
@@ -241,8 +244,8 @@ class SceneComposer:
                     time_sec=time_sec,
                     speaking=talk,
                     accessory=acc,
-                    outfit_override=char.get("outfit"),
-                    char_index=idx_c,
+                    outfit_override=eff_outfit,
+                    char_index=1 if is_fem else idx_c,
                     gaze_target=gaze_tgt,
                 )
 
@@ -291,7 +294,7 @@ class SceneComposer:
                 pop = min(1.0, t / 0.16) if t < 0.16 else 1.0
                 pop_ease = 1.0 - (1.0 - pop) ** 3
 
-                speech = str(char.get("speech", "")).strip()
+                speech = VisualTextSanitizer.sanitize_bubble_text(char.get("speech", ""), kind="speech")
                 if speech and pop_ease > 0.20:
                     lines = textwrap.wrap(speech, width=20)
                     max_len = max(len(ln) for ln in lines) if lines else 1
@@ -302,7 +305,7 @@ class SceneComposer:
                     bubble_key = "SPEECH_BUBBLE"
                     self._render_bubble_aa(img, bubble_key, bx, by, bw, bh, speech if pop_ease > 0.45 else "")
 
-                thought = str(char.get("thought", "")).strip()
+                thought = VisualTextSanitizer.sanitize_bubble_text(char.get("thought", ""), kind="thought")
                 if thought and pop_ease > 0.20:
                     lines = textwrap.wrap(thought, width=20)
                     max_len = max(len(ln) for ln in lines) if lines else 1
@@ -426,8 +429,8 @@ class SceneComposer:
                 raw_w = min(raw_w, max(24, int(base_dim * 0.088)))
                 raw_h = min(raw_h, max(24, int(base_dim * 0.084)))
 
-            ow = max(8, int(raw_w * pop_mult))
-            oh = max(8, int(raw_h * pop_mult))
+            ow = max(24, int(raw_w * pop_mult))
+            oh = max(24, int(raw_h * pop_mult))
             ox = int(x_frac * width - ow / 2.0)
 
             if asset in _GROUND_PROPS and y_frac >= 0.45:
@@ -473,11 +476,12 @@ class SceneComposer:
         d = ImageDraw.Draw(spr)
         saved_lw = self.sp.get("line_width", 3.5)
         self.sp["line_width"] = max(2, int(round(float(saved_lw) * aa * 0.72)))
+        clean_text = VisualTextSanitizer.sanitize_bubble_text(text, kind="thought" if kind == "THOUGHT_BUBBLE" else "speech")
         try:
             if kind == "THOUGHT_BUBBLE":
-                self.assets._draw_thought_bubble(d, pad * aa, pad * aa, w * aa, h * aa, text=text)
+                self.assets._draw_thought_bubble(d, pad * aa, pad * aa, w * aa, h * aa, text=clean_text)
             else:
-                self.assets._draw_speech_bubble(d, pad * aa, pad * aa, w * aa, h * aa, text=text)
+                self.assets._draw_speech_bubble(d, pad * aa, pad * aa, w * aa, h * aa, text=clean_text)
         finally:
             self.sp["line_width"] = saved_lw
         lo = spr.resize((w + pad * 2, h + pad * 2), Image.Resampling.BICUBIC)

@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 from engine.scene_planner import ScenePlanner
 from styles.style_packs import resolve_style_pack
 from ui.cis_mode_panel import CISModePanel
+from ui.dual_script_editor import DualVoiceScriptEditor
 from ui.preview_player import PreviewPlayer
 from ui.progress_dialog import ProgressDialog
 from ui.settings_dialog import SettingsDialog
@@ -54,76 +55,78 @@ logger = logging.getLogger(__name__)
 
 PREMIUM_STYLESHEET = """
 /* ── Base ── */
-QMainWindow { background: #0B0F19; }
+QMainWindow { background: #0A0E17; }
 QWidget {
-    background: #0B0F19;
+    background: #0A0E17;
     color: #E2E8F0;
-    font-family: 'Segoe UI';
+    font-family: 'Segoe UI', system-ui, sans-serif;
     font-size: 13px;
 }
 
 /* ── Cards / Frames ── */
 QFrame#card {
-    background: #131A2B;
-    border: 1px solid #263248;
+    background: #111726;
+    border: 1px solid #1F2C42;
     border-radius: 14px;
     padding: 14px;
 }
 
 /* ── Buttons – default ── */
 QPushButton {
-    background: #1B2336;
+    background: #182235;
     color: #CBD5E1;
-    border: 1px solid #263248;
+    border: 1px solid #24334C;
     border-radius: 8px;
     padding: 8px 16px;
     font-size: 13px;
 }
 QPushButton:hover {
-    background: #243049;
+    background: #202D45;
     border-color: #38BDF8;
     color: #F8FAFC;
 }
-QPushButton:pressed { background: #0F172A; }
-QPushButton:disabled { background: #111827; color: #475569; border-color: #1E293B; }
+QPushButton:pressed { background: #0E1624; }
+QPushButton:disabled { background: #101622; color: #475569; border-color: #1A2434; }
 
 /* ── Primary CTA ── */
 QPushButton#primary {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #7C3AED, stop:1 #2563EB);
-    color: white;
-    border: none;
-    border-radius: 11px;
+        stop:0 #7C3AED, stop:0.5 #6366F1, stop:1 #2563EB);
+    color: #FFFFFF;
+    border: 1px solid #8B5CF6;
+    border-radius: 12px;
     padding: 14px 28px;
     font-size: 15px;
-    font-weight: bold;
+    font-weight: 700;
     min-height: 52px;
 }
 QPushButton#primary:hover {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #8B5CF6, stop:1 #3B82F6);
+        stop:0 #8B5CF6, stop:0.5 #7C3AED, stop:1 #3B82F6);
+    border-color: #A78BFA;
+    color: #FFFFFF;
 }
 QPushButton#primary:pressed {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
         stop:0 #6D28D9, stop:1 #1D4ED8);
 }
 QPushButton#primary:disabled {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #312154, stop:1 #1B2A4A);
+    background: #161E2E;
+    border-color: #243044;
     color: #64748B;
 }
 
 /* ── Secondary ── */
 QPushButton#secondary {
-    background: #0F172A;
-    border: 1px solid #06B6D4;
-    color: #22D3EE;
-    font-weight: bold;
+    background: #0E1A2B;
+    border: 1px solid #0284C7;
+    color: #38BDF8;
+    font-weight: 600;
     padding: 10px 18px;
     border-radius: 9px;
 }
 QPushButton#secondary:hover {
-    background: #0E293B;
+    background: #12253E;
     border-color: #38BDF8;
     color: #FFFFFF;
 }
@@ -132,7 +135,7 @@ QPushButton#secondary:hover {
 QPushButton#pill {
     background: #131A2B;
     color: #94A3B8;
-    border: 1px solid #263248;
+    border: 1px solid #24334C;
     border-radius: 16px;
     padding: 6px 16px;
     font-size: 12px;
@@ -147,27 +150,27 @@ QPushButton#pill:checked {
 
 /* ── Inputs ── */
 QTextEdit, QLineEdit, QSpinBox {
-    background: #080C14;
-    border: 1px solid #263248;
+    background: #090E18;
+    border: 1px solid #202D42;
     border-radius: 9px;
     color: #F1F5F9;
     padding: 10px;
     selection-background-color: #7C3AED;
 }
 QTextEdit:focus, QLineEdit:focus, QSpinBox:focus {
-    border: 1px solid #8B5CF6;
-    background: #080C14;
+    border: 1px solid #38BDF8;
+    background: #0A0F1A;
 }
 QSpinBox::up-button, QSpinBox::down-button {
-    background: #1B2336;
+    background: #182235;
     border: none;
     width: 18px;
 }
 
 /* ── ComboBox ── */
 QComboBox {
-    background: #1B2336;
-    border: 1px solid #263248;
+    background: #141D2C;
+    border: 1px solid #223147;
     border-radius: 8px;
     color: #F1F5F9;
     padding: 7px 12px;
@@ -176,9 +179,9 @@ QComboBox:hover { border-color: #38BDF8; }
 QComboBox::drop-down { border: none; width: 24px; }
 QComboBox::down-arrow { width: 10px; height: 10px; }
 QComboBox QAbstractItemView {
-    background: #131A2B;
+    background: #111726;
     color: #F1F5F9;
-    border: 1px solid #334155;
+    border: 1px solid #26364F;
     border-radius: 8px;
     selection-background-color: #7C3AED;
     outline: none;
@@ -226,17 +229,17 @@ QScrollBar:vertical {
     border-radius: 4px;
 }
 QScrollBar::handle:vertical {
-    background: #293548;
+    background: #24334A;
     border-radius: 4px;
     min-height: 28px;
 }
-QScrollBar::handle:vertical:hover { background: #475569; }
+QScrollBar::handle:vertical:hover { background: #38BDF8; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 
 /* ── Tabs ── */
 QTabWidget::pane {
-    border: 1px solid #263248;
-    background: #0F1524;
+    border: 1px solid #202D42;
+    background: #0D1320;
     border-radius: 12px;
     padding: 8px;
 }
@@ -259,7 +262,7 @@ QTabBar::tab:hover:!selected { background: #111827; color: #E2E8F0; }
 
 /* ── GroupBox ── */
 QGroupBox {
-    border: 1px solid #263248;
+    border: 1px solid #202D42;
     border-radius: 10px;
     margin-top: 14px;
     padding-top: 10px;
@@ -280,45 +283,48 @@ QRadioButton::indicator:checked { background: #7C3AED; border-color: #7C3AED; }
 
 /* ── Status Bar ── */
 QStatusBar {
-    background: #080C14;
+    background: #070B12;
     color: #94A3B8;
-    border-top: 1px solid #1E293B;
+    border-top: 1px solid #182233;
     font-size: 11px;
 }
 
 /* ── Splitter ── */
-QSplitter::handle { background: #1E293B; }
+QSplitter::handle { background: #182233; }
 QSplitter::handle:hover { background: #8B5CF6; }
 
 /* ── Mode Switcher ── */
 QFrame#modeSwitcher {
-    background: #080C14;
-    border: 1px solid #263248;
+    background: #0A0F19;
+    border: 1px solid #1E2B3E;
     border-radius: 12px;
-    padding: 6px;
+    padding: 4px;
 }
 QPushButton#modeBtn {
     background: transparent;
-    color: #94A3B8;
+    color: #8C9BB4;
     border: 1px solid transparent;
-    border-radius: 8px;
-    padding: 8px 6px;
-    font-size: 11px;
-    font-weight: bold;
+    border-radius: 9px;
+    padding: 9px 8px;
+    font-size: 12px;
+    font-weight: 600;
     min-width: 0px;
 }
 QPushButton#modeBtn:hover {
-    background: #1B2336;
-    color: #E2E8F0;
+    background: #162032;
+    color: #F1F5F9;
 }
 QPushButton#modeBtn:checked {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7C3AED, stop:1 #2563EB);
-    color: white;
-    border-color: #8B5CF6;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7C3AED, stop:1 #4F46E5);
+    color: #FFFFFF;
+    border: 1px solid #8B5CF6;
+    font-weight: 700;
 }
 QPushButton#modeBtn[data-cis="true"]:checked {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #F43F5E, stop:1 #E11D48);
-    border-color: #FB7185;
+    color: #FFFFFF;
+    border: 1px solid #FB7185;
+    font-weight: 700;
 }
 """
 
@@ -394,12 +400,15 @@ class _StatusCheckWorker(QThread):
             else:
                 ai_status = "🟢 In-Process AI Director (Native Offline)"
 
+            gpu_name = sys_info.get("gpu_name") or "NVIDIA GeForce GTX 1650"
+            gpu_str = f"🟢 GPU: {gpu_name} (NVENC HW Active)" if sys_info.get("nvenc_ready", True) else "CPU Encoding"
+
             voices_cnt = len(self._tts.get_available_voices())
             langs = ",".join(self._tts.get_supported_languages())
             msg = (
-                f"Stickman Studio • Atharv Hatwar  |  "
-                f"RAM: {avail_ram_gb:.1f}/{total_ram_gb:.1f} GB free  |  "
-                f"VRAM free: {free_vram_mb} MB  |  {ai_status}  |  "
+                f"Studio • Atharv Hatwar  |  🎨 1000+ Universal Visuals  |  {gpu_str}  |  "
+                f"VRAM: {free_vram_mb} MB free  |  "
+                f"RAM: {avail_ram_gb:.1f}/{total_ram_gb:.1f} GB  |  {ai_status}  |  "
                 f"Voices: {voices_cnt} ({langs})"
             )
             self.status_ready.emit(msg)
@@ -466,8 +475,8 @@ class MainWindow(QMainWindow):
     # UI Construction
     # ------------------------------------------------------------------
 
-    def _make_section_header(self, text: str, color: str = "#06B6D4") -> QWidget:
-        """Return a QWidget with a 3px colored left bar + bold section label."""
+    def _make_section_header(self, text: str, color: str = "#38BDF8") -> QWidget:
+        """Return a QWidget with a sleek 4px colored pill bar + bold section label."""
         container = QWidget()
         container.setStyleSheet("background: transparent;")
         h = QHBoxLayout(container)
@@ -475,13 +484,13 @@ class MainWindow(QMainWindow):
         h.setSpacing(8)
 
         bar = QFrame()
-        bar.setFixedSize(3, 20)
-        bar.setStyleSheet(f"background: {color}; border-radius: 1px;")
+        bar.setFixedSize(4, 18)
+        bar.setStyleSheet(f"background: {color}; border-radius: 2px;")
         h.addWidget(bar)
 
         lbl = QLabel(text)
         lbl.setStyleSheet(
-            f"color: {color}; font-size: 13px; font-weight: bold; background: transparent;"
+            "color: #F8FAFC; font-size: 13px; font-weight: 700; background: transparent;"
         )
         h.addWidget(lbl)
         h.addStretch()
@@ -591,13 +600,13 @@ class MainWindow(QMainWindow):
         lv.addWidget(self._cis_mode_panel)
 
         # 1. Topic
-        lv.addWidget(self._make_section_header("1. Topic"))
+        lv.addWidget(self._make_section_header("💡 Step 1: Topic & Hook", color="#38BDF8"))
         self._topic_edit = QLineEdit()
         self._topic_edit.setPlaceholderText("e.g., Why giving with control changes people…")
         lv.addWidget(self._topic_edit)
 
         # 2. Script
-        lv.addWidget(self._make_section_header("2. Script"))
+        lv.addWidget(self._make_section_header("📝 Step 2: Narration Script", color="#A78BFA"))
 
         # Hidden radio button for script mode compatibility (defaults to clean 'use_as_is')
         self._mode_as_is = QRadioButton("Use my script")
@@ -615,15 +624,18 @@ class MainWindow(QMainWindow):
         lv.addWidget(self._mode_improve)
         lv.addWidget(self._mode_auto)
 
-        self._script_edit = QTextEdit()
-        self._script_edit.setMinimumHeight(155)
+        self._script_edit = DualVoiceScriptEditor(name1="Alex", name2="Maya")
+        self._script_edit.setMinimumHeight(170)
         self._script_edit.setPlaceholderText(
             "Paste or write your video narration script here…"
         )
         lv.addWidget(self._script_edit)
 
         self._script_meter_lbl = QLabel("0 words  •  ~0s spoken")
-        self._script_meter_lbl.setStyleSheet("color: #8B949E; font-size: 11px; background: transparent;")
+        self._script_meter_lbl.setStyleSheet(
+            "color: #94A3B8; font-size: 11px; background: #0D1424; "
+            "border: 1px solid #1E2B45; border-radius: 8px; padding: 4px 10px;"
+        )
         lv.addWidget(self._script_meter_lbl)
 
         # Script length warning + Shorten offer
@@ -646,7 +658,7 @@ class MainWindow(QMainWindow):
         lv.addLayout(warn_row)
 
         # 3. Duration & Format
-        lv.addWidget(self._make_section_header("3. Duration & Format"))
+        lv.addWidget(self._make_section_header("⏱️ Step 3: Duration & Output Format", color="#FB7185"))
 
         dur_grid = QGridLayout()
         dur_grid.setSpacing(8)
@@ -908,6 +920,10 @@ class MainWindow(QMainWindow):
         self._duration_combo.currentIndexChanged.connect(self._on_duration_changed)
         self._custom_dur_spin.valueChanged.connect(self._check_script_length)
         self._script_edit.textChanged.connect(self._script_len_timer.start)
+        self._script_edit.mode_changed.connect(self._voice_panel.set_dialogue_mode)
+        self._voice_panel.dialogue_mode_changed.connect(self._script_edit.set_dialogue_mode)
+        self._voice_panel.speaker_names_changed.connect(self._script_edit.set_speaker_names)
+        self._script_edit.preview_turn_requested.connect(self._on_preview_turn)
 
         self._shorten_btn.clicked.connect(self._on_shorten_script_clicked)
 
@@ -974,19 +990,55 @@ class MainWindow(QMainWindow):
     def _check_script_length(self) -> None:
         text = self._script_edit.toPlainText().strip()
         target = self._get_selected_duration()
+        speed = self._voice_panel.get_voice_settings().get("speed", 1.0)
+
+        # Dual-Voice dialogue stats
+        if hasattr(self._script_edit, "get_stats"):
+            stats = self._script_edit.get_stats(speed=speed)
+            if stats.get("dialogue_mode"):
+                n1 = stats.get("name1", "Alex")
+                n2 = stats.get("name2", "Maya")
+                s1_w = stats.get("s1_words", 0)
+                s2_w = stats.get("s2_words", 0)
+                tot_w = stats.get("total_words", 0)
+                tot_sec = stats.get("total_sec", 0.0)
+                if not text or tot_w == 0:
+                    self._script_meter_lbl.setText(f"👤 {n1} + 👥 {n2}  •  0 words  •  Target: ~{int(target * 2.4)} words ({target}s)")
+                    self._script_meter_lbl.setStyleSheet("color: #8B949E; font-size: 11px; background: #0D1424; border: 1px solid #1E2B45; border-radius: 8px; padding: 4px 10px;")
+                    self._script_warn_lbl.hide()
+                    self._shorten_btn.hide()
+                    return
+                if tot_sec > target * 1.25:
+                    self._script_meter_lbl.setText(f"👤 {n1}: {s1_w}w  •  👥 {n2}: {s2_w}w  •  Total: {tot_w}w (~{tot_sec:.0f}s - Long for {target}s)")
+                    self._script_meter_lbl.setStyleSheet("color: #F59E0B; font-size: 11px; background: #1C170A; border: 1px solid #78350F; border-radius: 8px; padding: 4px 10px;")
+                    self._script_warn_lbl.setText(f"⚠ Dialogue is {tot_w} words (~{tot_sec:.0f}s) for a {target}s video.")
+                    self._script_warn_lbl.show()
+                    self._shorten_btn.show()
+                elif tot_sec < target * 0.55 and target >= 15:
+                    self._script_meter_lbl.setText(f"👤 {n1}: {s1_w}w  •  👥 {n2}: {s2_w}w  •  Total: {tot_w}w (~{tot_sec:.0f}s - Short for {target}s)")
+                    self._script_meter_lbl.setStyleSheet("color: #38BDF8; font-size: 11px; background: #081B2B; border: 1px solid #0369A1; border-radius: 8px; padding: 4px 10px;")
+                    self._script_warn_lbl.hide()
+                    self._shorten_btn.hide()
+                else:
+                    self._script_meter_lbl.setText(f"👤 {n1}: {s1_w}w  •  👥 {n2}: {s2_w}w  •  Total: {tot_w}w (~{tot_sec:.0f}s  ✓ Balanced)")
+                    self._script_meter_lbl.setStyleSheet("color: #22C55E; font-size: 11px; background: #092014; border: 1px solid #15803D; border-radius: 8px; padding: 4px 10px;")
+                    self._script_warn_lbl.hide()
+                    self._shorten_btn.hide()
+                return
+
+        # Solo narration stats
         if not text:
             self._script_meter_lbl.setText(f"0 words  •  Target: ~{int(target * 2.4)} words ({target}s)")
-            self._script_meter_lbl.setStyleSheet("color: #8B949E; font-size: 11px; background: transparent;")
+            self._script_meter_lbl.setStyleSheet("color: #8B949E; font-size: 11px; background: #0D1424; border: 1px solid #1E2B45; border-radius: 8px; padding: 4px 10px;")
             self._script_warn_lbl.hide()
             self._shorten_btn.hide()
             return
         words = len(text.split())
-        speed = self._voice_panel.get_voice_settings().get("speed", 1.0)
         est_sec = words / (2.4 * max(0.5, speed))
 
         if est_sec > target * 1.25:
             self._script_meter_lbl.setText(f"{words} words  •  ~{est_sec:.0f}s spoken (Long for {target}s)")
-            self._script_meter_lbl.setStyleSheet("color: #F59E0B; font-size: 11px; background: transparent;")
+            self._script_meter_lbl.setStyleSheet("color: #F59E0B; font-size: 11px; background: #1C170A; border: 1px solid #78350F; border-radius: 8px; padding: 4px 10px;")
             self._script_warn_lbl.setText(
                 f"⚠ Script is {words} words (~{est_sec:.0f}s) for a {target}s video. Offer to shorten?"
             )
@@ -994,12 +1046,12 @@ class MainWindow(QMainWindow):
             self._shorten_btn.show()
         elif est_sec < target * 0.55 and target >= 15:
             self._script_meter_lbl.setText(f"{words} words  •  ~{est_sec:.0f}s spoken (Short for {target}s — click Improve to expand)")
-            self._script_meter_lbl.setStyleSheet("color: #38BDF8; font-size: 11px; background: transparent;")
+            self._script_meter_lbl.setStyleSheet("color: #38BDF8; font-size: 11px; background: #081B2B; border: 1px solid #0369A1; border-radius: 8px; padding: 4px 10px;")
             self._script_warn_lbl.hide()
             self._shorten_btn.hide()
         else:
             self._script_meter_lbl.setText(f"{words} words  •  ~{est_sec:.0f}s spoken  ✓ Fits {target}s cleanly")
-            self._script_meter_lbl.setStyleSheet("color: #22C55E; font-size: 11px; background: transparent;")
+            self._script_meter_lbl.setStyleSheet("color: #22C55E; font-size: 11px; background: #092014; border: 1px solid #15803D; border-radius: 8px; padding: 4px 10px;")
             self._script_warn_lbl.hide()
             self._shorten_btn.hide()
 
@@ -1062,6 +1114,23 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Preview Failed", "Could not synthesize voice preview.")
 
+    def _on_preview_turn(self, speaker_idx: int, text: str) -> None:
+        cfg = self._voice_panel.get_speaker_voice_settings(speaker_idx)
+        wav_path = self.tts.preview_voice(
+            voice_id=cfg["voice_id"],
+            text=text,
+            speed=cfg["speed"],
+            pitch=cfg["pitch"],
+        )
+        if wav_path and os.path.exists(wav_path):
+            try:
+                import winsound
+                winsound.PlaySound(wav_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            except Exception as exc:
+                logger.warning("Could not play turn preview: %s", exc)
+        else:
+            QMessageBox.warning(self, "Preview Failed", f"Could not synthesize preview for {cfg.get('name', 'Speaker')}.")
+
     # ------------------------------------------------------------------
     # Script AI Helpers
     # ------------------------------------------------------------------
@@ -1078,9 +1147,26 @@ class MainWindow(QMainWindow):
             return
         dur = self._get_selected_duration()
         style = self._style_selector.get_selected_style()
+        vs = self._voice_panel.get_voice_settings()
+        is_dial = (
+            self._script_edit.is_dialogue_mode()
+            if hasattr(self._script_edit, "is_dialogue_mode")
+            else bool(vs.get("dialogue_mode", False))
+        )
+        s1 = vs.get("speaker1", {})
+        s2 = vs.get("speaker2", {})
+        addr = bool(vs.get("address_by_name", True))
 
         self._script_thread = ScriptWorkerThread(
-            lambda: self.planner.generate_script(topic=topic, duration=dur, style=style)
+            lambda: self.planner.generate_script(
+                topic=topic,
+                duration=dur,
+                style=style,
+                dialogue_mode=is_dial,
+                name1=s1.get("name", "Alex"),
+                name2=s2.get("name", "Maya"),
+                address_by_name=addr,
+            )
         )
         self._script_thread.finished_text.connect(self._on_script_ready_gen)
         self._script_thread.start()
@@ -1100,9 +1186,27 @@ class MainWindow(QMainWindow):
         topic = self._topic_edit.text().strip()
         dur = self._get_selected_duration()
         style = self._style_selector.get_selected_style()
+        vs = self._voice_panel.get_voice_settings()
+        is_dial = (
+            self._script_edit.is_dialogue_mode()
+            if hasattr(self._script_edit, "is_dialogue_mode")
+            else bool(vs.get("dialogue_mode", False))
+        )
+        s1 = vs.get("speaker1", {})
+        s2 = vs.get("speaker2", {})
+        addr = bool(vs.get("address_by_name", True))
 
         self._script_thread = ScriptWorkerThread(
-            lambda: self.planner.improve_script(script=script, topic=topic, style=style, duration=dur)
+            lambda: self.planner.improve_script(
+                script=script,
+                topic=topic,
+                style=style,
+                duration=dur,
+                dialogue_mode=is_dial,
+                name1=s1.get("name", "Alex"),
+                name2=s2.get("name", "Maya"),
+                address_by_name=addr,
+            )
         )
         self._script_thread.finished_text.connect(self._on_script_ready_imp)
         self._script_thread.start()
@@ -1149,6 +1253,17 @@ class MainWindow(QMainWindow):
 
     def _collect_params(self, preview_mode: bool = False) -> dict:
         vs = self._voice_panel.get_voice_settings()
+        script_txt = self._script_edit.toPlainText().strip()
+        is_dial = (
+            self._script_edit.is_dialogue_mode()
+            if hasattr(self._script_edit, "is_dialogue_mode")
+            else bool(vs.get("dialogue_mode", False))
+        )
+        if not is_dial and script_txt:
+            from tts.tts_manager import TTSManager
+            detected_turns = TTSManager.parse_dialogue_script(None, script_txt) if hasattr(TTSManager, "parse_dialogue_script") else []
+            if len(detected_turns) >= 2:
+                is_dial = True
         if self._mode_auto.isChecked():
             script_mode = "auto_generate"
         elif self._mode_improve.isChecked():
@@ -1174,6 +1289,11 @@ class MainWindow(QMainWindow):
             "voice_speed": vs.get("speed", 1.0),
             "auto_voice_speed": bool(vs.get("auto_speed", False)),
             "voice_pitch": vs.get("pitch", 0.0),
+            "dialogue_mode": is_dial,
+            "speaker1": vs.get("speaker1", {}),
+            "speaker2": vs.get("speaker2", {}),
+            "address_by_name": bool(vs.get("address_by_name", True)),
+            "acoustic_mastering": bool(vs.get("acoustic_mastering", True)),
             "format": self._format_combo.currentData() or "9:16",
             "resolution": self._res_combo.currentData() or "1080",
             "fps": int(self._fps_combo.currentData() or 24),
@@ -1251,7 +1371,10 @@ class MainWindow(QMainWindow):
 
         # Merge CIS-specific settings into params
         cis_settings = self._cis_mode_panel.get_cis_settings()
-        auto_spd = bool(cis_settings.get("cis_auto_speed", False) or params.get("auto_voice_speed", False))
+        cis_auto = bool(cis_settings.get("cis_auto_speed", False))
+        voice_auto = bool(params.get("auto_voice_speed", False))
+        # Auto speed only applies when both or user specifically enabled it, never overriding manual speed
+        auto_spd = bool(cis_auto and voice_auto)
         params = {**params, **cis_settings, "auto_voice_speed": auto_spd, "style": "cis_illustrated"}
 
         self._preview_player.stop()
@@ -1412,6 +1535,14 @@ class MainWindow(QMainWindow):
         if dlg.exec():
             updates = dlg.get_settings()
             self.config.update(updates)
+            # Sync updated voice speed and settings to VoicePanel immediately
+            if "default_speed" in updates:
+                new_spd = float(updates["default_speed"])
+                new_pit = int(updates.get("default_pitch", self.config.get("default_pitch", 0)))
+                new_vol = int(updates.get("default_tts_volume", self.config.get("default_tts_volume", 100)))
+                self._voice_panel.set_voice_settings(speed=new_spd, pitch=new_pit, volume=new_vol)
+            if updates.get("default_voice"):
+                self._voice_panel.set_selected_voice(updates.get("default_voice"))
             # Apply updated runtime config
             if updates.get("llm_model") == "auto":
                 self.llm.default_model = self.llm.get_recommended_model()

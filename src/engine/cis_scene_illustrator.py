@@ -23,6 +23,8 @@ from typing import Any, Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
+from engine.text_sanitizer import VisualTextSanitizer
+
 logger = logging.getLogger(__name__)
 
 CANVAS_W, CANVAS_H = 1080, 1920
@@ -271,7 +273,8 @@ def draw_fitted_text(
     min_size: int = 16,
     line_spacing: float = 1.18,
 ) -> None:
-    clean = " ".join((text or "").split())
+    sanitized = VisualTextSanitizer.sanitize_label(text, default="")
+    clean = " ".join((sanitized or "").split())
     if not clean:
         return
     size = target_size
@@ -301,6 +304,7 @@ def draw_stickman_figure(
     ink: str = INK,
     head_fill: str = WHITE,
     seed: int = 100,
+    is_female: bool = False,
 ) -> None:
     """
     Draw an expressive, high-clarity stickman at (cx, cy) head center.
@@ -327,6 +331,26 @@ def draw_stickman_figure(
         draw.ellipse([cx - int(12 * scale), eye_y - er, cx - int(6 * scale), eye_y + er], fill=ink)
         draw.ellipse([cx + int(6 * scale), eye_y - er, cx + int(12 * scale), eye_y + er], fill=ink)
 
+    # Female Stickman: delicate curved cartoon eyelashes + stylish ponytail with ribbon!
+    if is_female:
+        for eye_x in (cx - int(9 * scale), cx + int(9 * scale)):
+            lash_d = 1 if eye_x > cx else -1
+            draw.line([(eye_x + lash_d * 4 * scale, eye_y - 2 * scale), (eye_x + lash_d * 10 * scale, eye_y - 6 * scale)], fill=ink, width=max(2, int(2.5 * scale)))
+            draw.line([(eye_x + lash_d * 2 * scale, eye_y - 4 * scale), (eye_x + lash_d * 7 * scale, eye_y - 9 * scale)], fill=ink, width=max(2, int(2.2 * scale)))
+
+        # Ponytail with ribbon
+        tie_x, tie_y = cx - int(head_r * 0.75), cy - int(head_r * 0.25)
+        draw.ellipse([tie_x - 5 * scale, tie_y - 5 * scale, tie_x + 5 * scale, tie_y + 5 * scale], fill=accent_color)
+        pony_pts = [
+            (tie_x, tie_y),
+            (tie_x - int(24 * scale), tie_y + int(8 * scale)),
+            (tie_x - int(38 * scale), tie_y + int(36 * scale)),
+            (tie_x - int(30 * scale), tie_y + int(56 * scale)),
+            (tie_x - int(18 * scale), tie_y + int(40 * scale)),
+            (tie_x, tie_y + int(8 * scale)),
+        ]
+        draw.polygon(pony_pts, fill=ink)
+
     neck_y = cy + head_r
     torso_end_x = cx
     torso_bot_y = neck_y + torso_len
@@ -336,6 +360,16 @@ def draw_stickman_figure(
         torso_bot_y = neck_y + int(155 * scale)
         draw.arc([cx - 8, cy + 10, cx + 10, cy + 24], 0, 180, fill=ink, width=3)
         hand_line(draw, cx, neck_y, torso_end_x, torso_bot_y, seed=seed + 2, lw=lw, color=ink)
+
+    if is_female:
+        skirt_w = int(36 * scale)
+        skirt_pts = [
+            (cx - int(12 * scale), neck_y + int(45 * scale)),
+            (cx + int(12 * scale), neck_y + int(45 * scale)),
+            (cx + skirt_w, torso_bot_y + int(12 * scale)),
+            (cx - skirt_w, torso_bot_y + int(12 * scale)),
+        ]
+        draw.polygon(skirt_pts, fill=accent_color, outline=ink, width=max(2, lw - 1))
         # Striding legs
         hand_curve(draw, [(torso_end_x, torso_bot_y), (torso_end_x + 42 * scale, torso_bot_y + 72 * scale), (torso_end_x + 76 * scale, torso_bot_y + 132 * scale)], seed=seed + 5, lw=lw, color=ink)
         hand_curve(draw, [(torso_end_x, torso_bot_y), (torso_end_x - 36 * scale, torso_bot_y + 68 * scale), (torso_end_x - 74 * scale, torso_bot_y + 118 * scale)], seed=seed + 6, lw=lw, color=ink)
@@ -354,6 +388,16 @@ def draw_stickman_figure(
         return
 
     hand_line(draw, cx, neck_y, torso_end_x, torso_bot_y, seed=seed + 2, lw=lw, color=ink)
+
+    if is_female:
+        skirt_w = int(36 * scale)
+        skirt_pts = [
+            (cx - int(12 * scale), neck_y + int(45 * scale)),
+            (cx + int(12 * scale), neck_y + int(45 * scale)),
+            (cx + skirt_w, torso_bot_y + int(12 * scale)),
+            (cx - skirt_w, torso_bot_y + int(12 * scale)),
+        ]
+        draw.polygon(skirt_pts, fill=accent_color, outline=ink, width=max(2, lw - 1))
 
     if pose == "pondering":
         draw.line([cx - 8, cy + 16, cx + 8, cy + 16], fill=ink, width=3)
@@ -473,16 +517,177 @@ def draw_semantic_prop(
     card_bg: str = WHITE,
     seed: int = 55,
 ) -> None:
-    """Draw a clean vector icon matching the literal subject spoken in the sentence."""
+    """Draw clean anti-aliased vector props covering all 12 multi-domain niches."""
     pk = (prop_kind or "spark").lower()
     tint = soft_tint_bg(accent, 0.26, base_hex=card_bg)
-    if pk == "heart":
-        draw_icon_heart(draw, cx, cy, accent=accent, ink=ink, card_bg=card_bg)
-        return
-    if pk == "coin":
+
+    # 1. Wealth & Business
+    if pk in ("coin", "money", "dollar", "wealth"):
         hand_circle(draw, cx, cy, r, seed=seed, lw=5, color=ink, fill=tint)
         hand_circle(draw, cx, cy, int(r * 0.72), seed=seed + 1, lw=3, color=accent)
         draw_fitted_text(draw, "$", cx, cy, max_w=int(r * 1.1), target_size=max(26, int(r * 0.9)), family="noto", fill=ink, bold=True)
+        return
+    if pk in ("bull", "crypto", "bitcoin", "stocks"):
+        # Bullish candlestick chart + arrow
+        bw, bh = int(r * 1.5), int(r * 1.2)
+        hand_rect(draw, cx - bw // 2, cy - bh // 2, bw, bh, seed=seed, lw=4, color=ink, fill=card_bg, r=12)
+        # Green & red candle bars
+        c_w = bw // 5
+        draw.line([cx - c_w * 1.5, cy + bh // 3, cx - c_w * 1.5, cy - bh // 3], fill=ink, width=2)
+        draw.rectangle([cx - c_w * 1.8, cy - bh // 8, cx - c_w * 1.2, cy + bh // 6], fill=ACCENT_CORAL, outline=ink, width=2)
+        draw.line([cx, cy + bh // 2.5, cx, cy - bh // 2.5], fill=ink, width=2)
+        draw.rectangle([cx - c_w * 0.3, cy - bh // 3, cx + c_w * 0.3, cy + bh // 8], fill=ACCENT_GREEN, outline=ink, width=2)
+        draw.line([cx + c_w * 1.5, cy + bh // 4, cx + c_w * 1.5, cy - bh // 2.2], fill=ink, width=2)
+        draw.rectangle([cx + c_w * 1.2, cy - bh // 2.4, cx + c_w * 1.8, cy - bh // 8], fill=ACCENT_GREEN, outline=ink, width=2)
+        return
+    if pk in ("vault", "safe", "bank"):
+        hw, hh = int(r * 1.2), int(r * 1.1)
+        hand_rect(draw, cx - hw, cy - hh, hw * 2, hh * 2, seed=seed, lw=5, color=ink, fill=card_bg, r=16)
+        hand_circle(draw, cx, cy, int(r * 0.55), seed=seed + 1, lw=4, color=ink, fill=tint)
+        # Safe wheel spokes
+        for ang in (0, 60, 120):
+            rad = math.radians(ang)
+            dx = int(math.cos(rad) * r * 0.45)
+            dy = int(math.sin(rad) * r * 0.45)
+            draw.line([cx - dx, cy - dy, cx + dx, cy + dy], fill=accent, width=4)
+        return
+
+    # 2. Tech & Code
+    if pk in ("code", "terminal", "developer"):
+        tw, th = int(r * 1.4), int(r * 1.0)
+        hand_rect(draw, cx - tw // 2, cy - th // 2, tw, th, seed=seed, lw=4, color=ink, fill=card_bg, r=10)
+        # Window bar dots
+        draw.ellipse([cx - tw // 2 + 10, cy - th // 2 + 8, cx - tw // 2 + 18, cy - th // 2 + 16], fill=ACCENT_CORAL)
+        draw.ellipse([cx - tw // 2 + 24, cy - th // 2 + 8, cx - tw // 2 + 32, cy - th // 2 + 16], fill=ACCENT_GOLD)
+        draw.ellipse([cx - tw // 2 + 38, cy - th // 2 + 8, cx - tw // 2 + 46, cy - th // 2 + 16], fill=ACCENT_GREEN)
+        # Code brackets </ >
+        draw_fitted_text(draw, "</>", cx, cy + 6, max_w=tw - 20, target_size=max(22, int(r * 0.65)), family="noto", fill=accent, bold=True)
+        return
+    if pk in ("cpu", "chip", "processor", "ai"):
+        cw = int(r * 1.2)
+        hand_rect(draw, cx - cw // 2, cy - cw // 2, cw, cw, seed=seed, lw=4, color=ink, fill=tint, r=8)
+        hand_rect(draw, cx - cw // 3, cy - cw // 3, cw * 2 // 3, cw * 2 // 3, seed=seed + 1, lw=3, color=accent, fill=card_bg, r=4)
+        # Pins
+        for d in (-cw // 3, 0, cw // 3):
+            draw.line([cx + d, cy - cw // 2 - 8, cx + d, cy - cw // 2], fill=ink, width=3)
+            draw.line([cx + d, cy + cw // 2, cx + d, cy + cw // 2 + 8], fill=ink, width=3)
+            draw.line([cx - cw // 2 - 8, cy + d, cx - cw // 2, cy + d], fill=ink, width=3)
+            draw.line([cx + cw // 2, cy + d, cx + cw // 2 + 8, cy + d], fill=ink, width=3)
+        return
+
+    # 3. Fitness & Health
+    if pk in ("dumbbell", "gym", "barbell", "workout"):
+        dw, dh = int(r * 1.6), int(r * 0.8)
+        # Bar
+        hand_line(draw, cx - dw // 2, cy, cx + dw // 2, cy, seed=seed, lw=6, color=ink)
+        # Heavy plates
+        hand_rect(draw, cx - dw // 2 - 14, cy - dh // 2, 14, dh, seed=seed + 1, lw=4, color=ink, fill=accent, r=4)
+        hand_rect(draw, cx - dw // 2, cy - int(dh * 0.4), 10, int(dh * 0.8), seed=seed + 2, lw=3, color=ink, fill=tint, r=3)
+        hand_rect(draw, cx + dw // 2 + 4, cy - dh // 2, 14, dh, seed=seed + 3, lw=4, color=ink, fill=accent, r=4)
+        hand_rect(draw, cx + dw // 2 - 10, cy - int(dh * 0.4), 10, int(dh * 0.8), seed=seed + 4, lw=3, color=ink, fill=tint, r=3)
+        return
+    if pk in ("heart_pulse", "ecg", "cardio"):
+        draw_icon_heart(draw, cx, cy, accent=accent, ink=ink, card_bg=card_bg)
+        # ECG zig-zag overlay
+        draw.line([cx - r // 2, cy, cx - r // 5, cy, cx - r // 10, cy - r // 3, cx + r // 10, cy + r // 3, cx + r // 5, cy, cx + r // 2, cy], fill=card_bg, width=4)
+        return
+
+    # 4. Science & Space
+    if pk in ("atom", "quantum", "physics"):
+        hand_circle(draw, cx, cy, int(r * 0.35), seed=seed, lw=4, color=ink, fill=accent)
+        # Elliptical orbits
+        draw.arc([cx - r, cy - int(r * 0.4), cx + r, cy + int(r * 0.4)], 0, 360, fill=ink, width=3)
+        draw.arc([cx - int(r * 0.5), cy - r, cx + int(r * 0.5), cy + r], 0, 360, fill=accent, width=3)
+        return
+    if pk in ("rocket", "space", "launch"):
+        # Sleek rocket
+        draw.polygon([(cx, cy - r), (cx + int(r * 0.4), cy + int(r * 0.4)), (cx - int(r * 0.4), cy + int(r * 0.4))], fill=card_bg, outline=ink)
+        hand_circle(draw, cx, cy - int(r * 0.1), int(r * 0.2), seed=seed, lw=3, color=ink, fill=tint)
+        # Exhaust plume
+        draw.polygon([(cx - int(r * 0.25), cy + int(r * 0.4)), (cx, cy + r), (cx + int(r * 0.25), cy + int(r * 0.4))], fill=ACCENT_CORAL)
+        return
+    if pk in ("dna", "helix", "gene"):
+        # Vertical double helix
+        for i in range(-4, 5):
+            y_pos = cy + int(i * r * 0.22)
+            shift = math.sin(i * 0.8) * r * 0.5
+            draw.line([cx - int(shift), y_pos, cx + int(shift), y_pos], fill=accent, width=4)
+            draw.ellipse([cx - int(shift) - 4, y_pos - 4, cx - int(shift) + 4, y_pos + 4], fill=ink)
+            draw.ellipse([cx + int(shift) - 4, y_pos - 4, cx + int(shift) + 4, y_pos + 4], fill=ink)
+        return
+
+    # 5. Stoicism & History
+    if pk in ("pillar", "column", "ancient"):
+        pw, ph = int(r * 0.8), int(r * 1.5)
+        # Capital top
+        hand_rect(draw, cx - pw // 2 - 8, cy - ph // 2, pw + 16, 16, seed=seed, lw=4, color=ink, fill=tint, r=4)
+        # Shaft
+        hand_rect(draw, cx - pw // 2, cy - ph // 2 + 16, pw, ph - 32, seed=seed + 1, lw=4, color=ink, fill=card_bg, r=2)
+        # Vertical fluting
+        for dx in (-pw // 4, 0, pw // 4):
+            draw.line([cx + dx, cy - ph // 2 + 20, cx + dx, cy + ph // 2 - 20], fill=ink, width=2)
+        # Base bottom
+        hand_rect(draw, cx - pw // 2 - 8, cy + ph // 2 - 16, pw + 16, 16, seed=seed + 2, lw=4, color=ink, fill=tint, r=4)
+        return
+    if pk in ("sword", "battle"):
+        draw.line([cx, cy - r, cx, cy + int(r * 0.6)], fill=ink, width=6)
+        draw.line([cx - int(r * 0.4), cy + int(r * 0.3), cx + int(r * 0.4), cy + int(r * 0.3)], fill=accent, width=5)
+        hand_circle(draw, cx, cy + int(r * 0.75), int(r * 0.15), seed=seed, lw=3, color=ink, fill=tint)
+        return
+    if pk in ("scroll", "parchment"):
+        sw, sh = int(r * 1.3), int(r * 1.0)
+        hand_rect(draw, cx - sw // 2, cy - sh // 2, sw, sh, seed=seed, lw=4, color=ink, fill=card_bg, r=10)
+        for dy in (-sh // 4, 0, sh // 4):
+            hand_line(draw, cx - sw // 3, cy + dy, cx + sw // 3, cy + dy, seed=seed + dy, lw=3, color=ink)
+        return
+
+    # 6. Productivity & Everyday
+    if pk in ("timer", "stopwatch"):
+        hand_circle(draw, cx, cy, r, seed=seed, lw=5, color=ink, fill=card_bg)
+        draw.pieslice([cx - r + 8, cy - r + 8, cx + r - 8, cy + r - 8], -90, 30, fill=tint, outline=accent, width=2)
+        hand_line(draw, cx, cy, cx, cy - int(r * 0.65), seed=seed + 1, lw=5, color=accent)
+        draw.line([cx, cy - r - 8, cx, cy - r], fill=ink, width=5)
+        return
+    if pk in ("target", "bullseye"):
+        hand_circle(draw, cx, cy, r, seed=seed, lw=5, color=ink, fill=card_bg)
+        hand_circle(draw, cx, cy, int(r * 0.65), seed=seed + 1, lw=4, color=accent, fill=tint)
+        hand_circle(draw, cx, cy, int(r * 0.3), seed=seed + 2, lw=4, color=ink, fill=accent)
+        return
+    if pk in ("coffee", "caffeine"):
+        cw, ch = int(r * 1.1), int(r * 1.2)
+        hand_rect(draw, cx - cw // 2, cy - ch // 4, cw, ch * 3 // 4, seed=seed, lw=4, color=ink, fill=card_bg, r=8)
+        # Handle
+        draw.arc([cx + cw // 2 - 8, cy - ch // 8, cx + cw // 2 + 20, cy + ch // 3], -90, 90, fill=ink, width=4)
+        # Steam waves
+        for ox in (-cw // 4, 0, cw // 4):
+            hand_curve(draw, [(cx + ox, cy - ch // 4 - 4), (cx + ox + 6, cy - ch // 4 - 18), (cx + ox - 4, cy - ch // 4 - 32)], seed=seed + ox, lw=3, color=accent)
+        return
+    if pk in ("battery", "energy", "charge"):
+        bw, bh = int(r * 0.9), int(r * 1.5)
+        hand_rect(draw, cx - bw // 2, cy - bh // 2 + 10, bw, bh - 10, seed=seed, lw=4, color=ink, fill=card_bg, r=10)
+        hand_rect(draw, cx - bw // 4, cy - bh // 2, bw // 2, 10, seed=seed + 1, lw=3, color=ink, fill=tint, r=3)
+        # Green charge fill
+        fill_h = int((bh - 24) * 0.75)
+        draw.rectangle([cx - bw // 2 + 6, cy + bh // 2 - 6 - fill_h, cx + bw // 2 - 6, cy + bh // 2 - 6], fill=ACCENT_GREEN)
+        return
+    if pk in ("iceberg", "depth"):
+        # Waterline
+        draw.line([cx - r * 1.2, cy, cx + r * 1.2, cy], fill=accent, width=4)
+        # Tip
+        draw.polygon([(cx - r // 3, cy), (cx, cy - r // 2), (cx + r // 3, cy)], fill=card_bg, outline=ink)
+        # Massive submerged base
+        draw.polygon([(cx - r // 3, cy), (cx + r // 3, cy), (cx + r * 0.9, cy + r * 0.9), (cx - r * 0.9, cy + r * 0.9)], fill=tint, outline=ink)
+        return
+    if pk in ("chess", "checkmate"):
+        # Pawn / Queen crown
+        pts = [(cx - r // 2, cy + r // 2), (cx - r // 3, cy - r // 4), (cx, cy - r // 2), (cx + r // 3, cy - r // 4), (cx + r // 2, cy + r // 2)]
+        draw.polygon(pts, fill=card_bg, outline=ink)
+        hand_circle(draw, cx, cy - r // 2 - 8, r // 4, seed=seed, lw=3, color=ink, fill=accent)
+        return
+
+    # Classical Props
+    if pk == "heart":
+        draw_icon_heart(draw, cx, cy, accent=accent, ink=ink, card_bg=card_bg)
         return
     if pk == "book":
         hw, hh = int(r * 0.95), int(r * 0.75)
@@ -543,11 +748,27 @@ def draw_semantic_prop(
         ]
         draw.polygon(pts, fill=ACCENT_GOLD, outline=ink)
         return
-    if pk == "phone":
-        pw, ph = int(r * 0.85), int(r * 1.45)
-        hand_rect(draw, cx - pw // 2, cy - ph // 2, pw, ph, seed=seed, lw=5, color=ink, fill=card_bg, r=12)
-        hand_circle(draw, cx, cy, max(12, r // 3), seed=seed + 1, lw=4, color=accent, fill=accent)
-        return
+
+    # Check 1,000+ procedural object engine
+    try:
+        from engine.procedural_object_engine import ProceduralObjectEngine
+        drawn = ProceduralObjectEngine.draw_object(
+            draw=draw,
+            asset_name=pk,
+            x=cx - r,
+            y=cy - r,
+            w=r * 2,
+            h=r * 2,
+            color=accent,
+            ink=ink,
+            line_width=4,
+            seed=seed,
+        )
+        if drawn:
+            return
+    except Exception:
+        pass
+
     # Default radiant sun/spark
     draw_icon_sparkle(draw, cx, cy, r, color=accent, ink=ink)
 
@@ -1292,6 +1513,830 @@ def _choreo_two_path_fork(scene: dict, accent: str, out_dir: Path, prefix: str) 
     return sprites, sprite_plan, vector_plan
 
 
+def _choreo_lighthouse_fog_beam(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    """Lighthouse beacon slicing through fog with alternating signals & overthinking stickman."""
+    th = _theme_of(scene)
+    ink, card_bg, muted = th["ink"], th["card_bg"], th["ink_muted"]
+    seed = int(scene.get("variant_seed", 301))
+    sprites: dict[str, Any] = {}
+
+    # Overthinking stickman gazing right
+    im_h, dh = _make_sprite(300, 440)
+    draw_stickman_figure(dh, 150, 80, scale=1.0, pose="anxious", accent_color=accent, ink=ink, head_fill=card_bg, seed=seed)
+    _save_sprite(sprites, "seeker", im_h, out_dir, prefix)
+
+    # Lighthouse tower
+    im_lh, dlh = _make_sprite(220, 480)
+    hand_rect(dlh, 30, 80, 160, 380, seed=seed + 1, lw=5, color=ink, fill=card_bg, r=10)
+    # Lantern room at top
+    hand_rect(dlh, 45, 20, 130, 60, seed=seed + 2, lw=4, color=accent, fill=soft_tint_bg(accent, 0.35, card_bg), r=8)
+    _save_sprite(sprites, "lighthouse", im_lh, out_dir, prefix)
+
+    # Beam bands
+    im_beam, db = _make_sprite(520, 220)
+    hand_rect(db, 10, 10, 500, 95, seed=seed + 3, lw=3, color=accent, fill=soft_tint_bg(accent, 0.22, card_bg), r=18)
+    draw_fitted_text(db, "+ WARMTH (1 DAY)", 260, 58, max_w=460, target_size=30, family="noto", fill=accent, bold=True)
+    hand_rect(db, 10, 115, 500, 95, seed=seed + 4, lw=3, color=muted, fill=card_bg, r=18)
+    draw_fitted_text(db, "- SILENCE (5 DAYS)", 260, 162, max_w=460, target_size=30, family="noto", fill=muted, bold=True)
+    _save_sprite(sprites, "beam_labels", im_beam, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "lighthouse", "anim": "pop_bounce", "cx0": 980, "cy0": 1000, "w": 220, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "beam_labels", "anim": "slide_in", "cx0": 600, "cy0": 900, "cx1": 600, "cy1": 950, "w": 520, "from_f": 0.10, "to_f": 1.0},
+        {"sprite": "seeker", "anim": "pop_bounce", "cx0": 240, "cy0": 1050, "w": 300, "from_f": 0.0, "to_f": 1.0},
+    ]
+    vector_plan = [
+        {"kind": "line", "x": 100, "y": 1280, "w": 880, "points": [[0, 0], [880, 0]], "color": ink, "lw": 4, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, vector_plan
+
+
+def _choreo_dopamine_spike_chart(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    """Neuro-pathway comparison: steady affection vs unpredictable dopamine jackpot."""
+    th = _theme_of(scene)
+    ink, card_bg, muted = th["ink"], th["card_bg"], th["ink_muted"]
+    seed = int(scene.get("variant_seed", 311))
+    sprites: dict[str, Any] = {}
+
+    # Left card: Predictable
+    im_c1, dc1 = _make_sprite(420, 360)
+    hand_rect(dc1, 10, 10, 400, 340, seed=seed, lw=4, color=muted, fill=card_bg, r=20, shadow=True)
+    draw_fitted_text(dc1, "PREDICTABLE AFFECTION", 210, 50, max_w=370, target_size=24, family="noto", fill=muted, bold=True)
+    draw_fitted_text(dc1, "Safe, steady rhythm", 210, 95, max_w=360, target_size=20, family="noto", fill=muted)
+    # Flat calm line
+    dc1.line([(40, 220), (380, 220)], fill=rgba(muted, 200), width=4)
+    draw_fitted_text(dc1, "Result: Safe (No Urgency)", 210, 290, max_w=360, target_size=18, family="noto", fill=muted)
+    _save_sprite(sprites, "card_steady", im_c1, out_dir, prefix)
+
+    # Right card: Intermittent Jackpot
+    im_c2, dc2 = _make_sprite(420, 360)
+    hand_rect(dc2, 10, 10, 400, 340, seed=seed + 1, lw=5, color=accent, fill=card_bg, r=20, shadow=True)
+    draw_fitted_text(dc2, "INTERMITTENT SIGNALS", 210, 50, max_w=370, target_size=24, family="noto", fill=accent, bold=True)
+    draw_fitted_text(dc2, "DOPAMINE JACKPOT!", 210, 95, max_w=360, target_size=22, family="noto", fill=accent, bold=True)
+    # Spiky erratic wave
+    spike_pts = [(40, 230), (100, 210), (160, 130), (220, 250), (280, 120), (340, 230), (380, 210)]
+    dc2.line(spike_pts, fill=rgba(accent, 255), width=5)
+    draw_fitted_text(dc2, "Result: Intense Cognitive Loop", 210, 290, max_w=360, target_size=18, family="noto", fill=accent)
+    _save_sprite(sprites, "card_jackpot", im_c2, out_dir, prefix)
+
+    # Central VS pill
+    im_vs, dvs = _make_sprite(90, 90)
+    dvs.ellipse([8, 8, 82, 82], fill=rgba(card_bg, 255), outline=rgba(ink, 255), width=3)
+    draw_fitted_text(dvs, "VS", 45, 46, max_w=70, target_size=24, family="noto", fill=ink, bold=True)
+    _save_sprite(sprites, "vs_badge", im_vs, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "card_steady", "anim": "slide_in", "cx0": 290, "cy0": 980, "cx1": 290, "cy1": 960, "w": 420, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "card_jackpot", "anim": "slide_in", "cx0": 790, "cy0": 980, "cx1": 790, "cy1": 960, "w": 420, "from_f": 0.12, "to_f": 1.0},
+        {"sprite": "vs_badge", "anim": "pop_bounce", "cx0": 540, "cy0": 960, "w": 90, "from_f": 0.25, "to_f": 1.0},
+    ]
+    vector_plan = []
+    return sprites, sprite_plan, vector_plan
+
+
+def _choreo_split_mirror_ideal(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    """Two-sided reality vs fantasy reflection with central mirror partition."""
+    th = _theme_of(scene)
+    ink, card_bg, muted = th["ink"], th["card_bg"], th["ink_muted"]
+    seed = int(scene.get("variant_seed", 325))
+    sprites: dict[str, Any] = {}
+
+    # Left: Cold Reality stickman
+    im_r, dr = _make_sprite(300, 450)
+    draw_stickman_figure(dr, 150, 80, scale=1.0, pose="anxious", accent_color=muted, ink=muted, head_fill=card_bg, seed=seed)
+    _save_sprite(sprites, "figure_reality", im_r, out_dir, prefix)
+
+    # Right: Warm Idealized Fantasy stickman with heart
+    im_f, df = _make_sprite(300, 450)
+    draw_stickman_figure(df, 150, 80, scale=1.02, pose="peaceful", accent_color=accent, ink=accent, head_fill=card_bg, seed=seed + 1)
+    # Heart above head
+    draw_icon_sparkle(df, 150, 36, 32, color=ACCENT_CORAL, ink=ACCENT_CORAL)
+    _save_sprite(sprites, "figure_fantasy", im_f, out_dir, prefix)
+
+    # Center mirror divider card
+    im_m, dm = _make_sprite(110, 480)
+    hand_rect(dm, 15, 15, 80, 450, seed=seed + 2, lw=4, color=ink, fill=card_bg, r=12)
+    # Vertical text "MIRROR"
+    letters = ["M", "I", "R", "R", "O", "R"]
+    for i, lt in enumerate(letters):
+        draw_fitted_text(dm, lt, 55, 60 + i * 65, max_w=40, target_size=28, family="noto", fill=ink, bold=True)
+    _save_sprite(sprites, "mirror_frame", im_m, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "figure_reality", "anim": "slide_in", "cx0": 260, "cy0": 1020, "cx1": 270, "cy1": 1020, "w": 300, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "mirror_frame", "anim": "pop_bounce", "cx0": 540, "cy0": 1020, "w": 110, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "figure_fantasy", "anim": "slide_in", "cx0": 820, "cy0": 1020, "cx1": 810, "cy1": 1020, "w": 300, "from_f": 0.15, "to_f": 1.0},
+    ]
+    vector_plan = []
+    return sprites, sprite_plan, vector_plan
+
+
+def _choreo_pedestal_bust_trap(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    """Sculpted bust of the past on elevated stone pedestal with heavy self-doubt anchor."""
+    th = _theme_of(scene)
+    ink, card_bg, muted = th["ink"], th["card_bg"], th["ink_muted"]
+    seed = int(scene.get("variant_seed", 337))
+    sprites: dict[str, Any] = {}
+
+    # Pedestal + Bust
+    im_ped, dped = _make_sprite(380, 520)
+    # Stone pedestal
+    hand_rect(dped, 40, 200, 300, 300, seed=seed, lw=5, color=ink, fill=card_bg, r=16)
+    draw_fitted_text(dped, "THE GHOST OF", 190, 270, max_w=270, target_size=22, family="noto", fill=muted, bold=True)
+    draw_fitted_text(dped, "WHO THEY WERE", 190, 320, max_w=270, target_size=24, family="noto", fill=accent, bold=True)
+    draw_fitted_text(dped, "AT THE BEGINNING", 190, 370, max_w=270, target_size=20, family="noto", fill=muted)
+    # Sculpted bust on top
+    dped.ellipse([140, 40, 240, 140], fill=rgba(card_bg, 255), outline=rgba(accent, 255), width=5)
+    _save_sprite(sprites, "pedestal_bust", im_ped, out_dir, prefix)
+
+    # Stickman kneeling / bowing with anchor
+    im_h, dh = _make_sprite(320, 450)
+    draw_stickman_figure(dh, 160, 80, scale=0.98, pose="anxious", accent_color=muted, ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "seeker_anchor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "seeker_anchor", "anim": "pop_bounce", "cx0": 310, "cy0": 1040, "w": 320, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "pedestal_bust", "anim": "slide_in", "cx0": 780, "cy0": 1060, "cx1": 780, "cy1": 1000, "w": 380, "from_f": 0.12, "to_f": 1.0},
+    ]
+    vector_plan = [
+        {"kind": "line", "x": 100, "y": 1280, "w": 880, "points": [[0, 0], [880, 0]], "color": ink, "lw": 4, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, vector_plan
+
+
+def _choreo_protective_couple_shield(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    """Stickman couple encircled by protective glowing emerald shield with green check badge."""
+    th = _theme_of(scene)
+    ink, card_bg, muted = th["ink"], th["card_bg"], th["ink_muted"]
+    seed = int(scene.get("variant_seed", 349))
+    sprites: dict[str, Any] = {}
+
+    # Couple holding hands (Male Alex & Female Maya with ponytail)
+    im_cp, dcp = _make_sprite(420, 460)
+    draw_stickman_figure(dcp, 140, 80, scale=0.98, pose="peaceful", accent_color=ACCENT_GREEN, ink=ink, head_fill=card_bg, seed=seed, is_female=False)
+    draw_stickman_figure(dcp, 280, 80, scale=0.98, pose="peaceful", accent_color=ACCENT_GREEN, ink=ink, head_fill=card_bg, seed=seed + 1, is_female=True)
+    # Green heart connecting them
+    draw_icon_sparkle(dcp, 210, 180, 44, color=ACCENT_GREEN, ink=ACCENT_GREEN)
+    _save_sprite(sprites, "couple", im_cp, out_dir, prefix)
+
+    # Protective aura shield
+    im_sh, dsh = _make_sprite(520, 520)
+    dsh.ellipse([20, 20, 500, 500], fill=rgba(soft_tint_bg(ACCENT_GREEN, 0.12, card_bg), 180), outline=rgba(ACCENT_GREEN, 240), width=6)
+    _save_sprite(sprites, "shield_aura", im_sh, out_dir, prefix)
+
+    # Top badges: Red X (Addiction) vs Green Check (Security)
+    im_b1, db1 = _make_sprite(360, 100)
+    hand_rect(db1, 10, 10, 340, 80, seed=seed + 3, lw=3, color=ACCENT_CORAL, fill=card_bg, r=16)
+    draw_fitted_text(db1, "X  ADDICTION TO SCRAPS", 180, 50, max_w=310, target_size=24, family="noto", fill=ACCENT_CORAL, bold=True)
+    _save_sprite(sprites, "badge_scraps", im_b1, out_dir, prefix)
+
+    im_b2, db2 = _make_sprite(360, 100)
+    hand_rect(db2, 10, 10, 340, 80, seed=seed + 4, lw=4, color=ACCENT_GREEN, fill=card_bg, r=16)
+    draw_fitted_text(db2, "✓  REAL SECURITY", 180, 50, max_w=310, target_size=24, family="noto", fill=ACCENT_GREEN, bold=True)
+    _save_sprite(sprites, "badge_security", im_b2, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "badge_scraps", "anim": "slide_in", "cx0": 300, "cy0": 680, "cx1": 300, "cy1": 720, "w": 360, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "badge_security", "anim": "slide_in", "cx0": 780, "cy0": 680, "cx1": 780, "cy1": 720, "w": 360, "from_f": 0.12, "to_f": 1.0},
+        {"sprite": "shield_aura", "anim": "pop_bounce", "cx0": 540, "cy0": 1040, "w": 520, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "couple", "anim": "pop_bounce", "cx0": 540, "cy0": 1040, "w": 420, "from_f": 0.15, "to_f": 1.0},
+    ]
+    vector_plan = []
+    return sprites, sprite_plan, vector_plan
+
+
+def _choreo_notification_fishhook(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    """Mobile notification card with curved fishing hook catching the emotional response."""
+    th = _theme_of(scene)
+    ink, card_bg, muted = th["ink"], th["card_bg"], th["ink_muted"]
+    seed = int(scene.get("variant_seed", 363))
+    sprites: dict[str, Any] = {}
+
+    # Whiplash Phase cards
+    im_cards, dcd = _make_sprite(840, 220)
+    # Phase 1: High
+    hand_rect(dcd, 20, 20, 380, 180, seed=seed, lw=4, color=ACCENT_GREEN, fill=card_bg, r=18)
+    draw_fitted_text(dcd, "PHASE 1: THE HIGH", 210, 60, max_w=340, target_size=24, family="noto", fill=ACCENT_GREEN, bold=True)
+    draw_fitted_text(dcd, "Texting until 2:00 AM", 210, 110, max_w=340, target_size=22, family="noto", fill=ink)
+    # Phase 2: Freeze
+    hand_rect(dcd, 440, 20, 380, 180, seed=seed + 1, lw=4, color=ACCENT_CORAL, fill=card_bg, r=18)
+    draw_fitted_text(dcd, "PHASE 2: DEEP FREEZE", 630, 60, max_w=340, target_size=24, family="noto", fill=ACCENT_CORAL, bold=True)
+    draw_fitted_text(dcd, "Days of total silence", 630, 110, max_w=340, target_size=22, family="noto", fill=muted)
+    _save_sprite(sprites, "phase_cards", im_cards, out_dir, prefix)
+
+    # Stickman staring down at phone
+    im_h, dh = _make_sprite(300, 440)
+    draw_stickman_figure(dh, 150, 80, scale=1.0, pose="anxious", accent_color=accent, ink=ink, head_fill=card_bg, seed=seed + 2)
+    _save_sprite(sprites, "seeker_phone", im_h, out_dir, prefix)
+
+    # Golden hooked text message: "Hey, I missed you..."
+    im_hk, dhk = _make_sprite(520, 140)
+    hand_rect(dhk, 15, 15, 490, 110, seed=seed + 3, lw=4, color=ACCENT_GOLD, fill=soft_tint_bg(ACCENT_GOLD, 0.25, card_bg), r=24)
+    draw_fitted_text(dhk, '"Hey, I missed you..."', 260, 70, max_w=450, target_size=32, family="caveat", fill=ink, bold=True)
+    _save_sprite(sprites, "hook_message", im_hk, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "phase_cards", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 720, "w": 840, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "seeker_phone", "anim": "pop_bounce", "cx0": 340, "cy0": 1080, "w": 300, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "hook_message", "anim": "slide_in", "cx0": 720, "cy0": 1150, "cx1": 720, "cy1": 1050, "w": 520, "from_f": 0.25, "to_f": 1.0},
+    ]
+    vector_plan = []
+    return sprites, sprite_plan, vector_plan
+
+
+# ---------------------------------------------------------------------------
+# Universal Multi-Domain Choreography Generators (Atharv Hatwar)
+# ---------------------------------------------------------------------------
+
+def _choreo_crypto_market_rally(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg, muted = th["ink"], th["card_bg"], th["ink_muted"]
+    seed = int(scene.get("variant_seed", 401))
+    sprites: dict[str, Any] = {}
+
+    # Market Rally Card with Green Candlestick Chart
+    im_c, dc = _make_sprite(860, 420)
+    hand_rect(dc, 20, 20, 820, 380, seed=seed, lw=4, color=ink, fill=card_bg, r=20)
+    draw_fitted_text(dc, "MARKET SURGE: +480% GAIN", 430, 75, max_w=760, target_size=32, family="noto", fill=ACCENT_GREEN, bold=True)
+    draw_semantic_prop(dc, "bull", 430, 230, 90, accent=ACCENT_GREEN, ink=ink, card_bg=card_bg, seed=seed)
+    _save_sprite(sprites, "market_card", im_c, out_dir, prefix)
+
+    # Celebrating Trader Stickman
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="spotlight_crown", accent_color=ACCENT_GREEN, ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "trader_actor", im_h, out_dir, prefix)
+
+    # Gold Coins Badge
+    im_coins, dcn = _make_sprite(420, 140)
+    hand_rect(dcn, 10, 10, 400, 120, seed=seed + 2, lw=3, color=ACCENT_GOLD, fill=soft_tint_bg(ACCENT_GOLD, 0.25, card_bg), r=16)
+    draw_semantic_prop(dcn, "coin", 80, 70, 36, accent=ACCENT_GOLD, ink=ink, card_bg=card_bg, seed=seed)
+    draw_fitted_text(dcn, "CAPITAL COMPOUNDED", 250, 70, max_w=280, target_size=22, family="noto", fill=ink, bold=True)
+    _save_sprite(sprites, "coins_badge", im_coins, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "market_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 720, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "trader_actor", "anim": "pop_bounce", "cx0": 340, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "coins_badge", "anim": "slide_in", "cx0": 740, "cy0": 1200, "cx1": 740, "cy1": 1120, "w": 420, "from_f": 0.2, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_terminal_code_deploy(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 402))
+    sprites: dict[str, Any] = {}
+
+    # Dark CLI Code Terminal Card
+    im_t, dt = _make_sprite(880, 440)
+    hand_rect(dt, 20, 20, 840, 400, seed=seed, lw=4, color="#10B981", fill="#0B131E", r=16)
+    # Window Dots
+    dt.ellipse([45, 45, 57, 57], fill="#EF4444")
+    dt.ellipse([67, 45, 79, 57], fill="#F59E0B")
+    dt.ellipse([89, 45, 101, 57], fill="#10B981")
+    draw_fitted_text(dt, "dev_terminal: main.py", 440, 52, max_w=400, target_size=20, family="noto", fill="#64748B", bold=False)
+    # Code syntax lines
+    draw_fitted_text(dt, "def build_scalable_system(input_data):", 440, 130, max_w=760, target_size=26, family="noto", fill="#38BDF8", bold=True)
+    draw_fitted_text(dt, "    architecture = optimize(input_data, concurrency=True)", 440, 185, max_w=760, target_size=22, family="noto", fill="#94A3B8")
+    draw_fitted_text(dt, "    return ship_to_production(version='2.0')", 440, 240, max_w=760, target_size=22, family="noto", fill="#A78BFA")
+    hand_rect(dt, 60, 310, 720, 70, seed=seed + 1, lw=2, color="#10B981", fill="#064E3B", r=10)
+    draw_fitted_text(dt, "✓ 0 ERRORS • BUILD & DEPLOY SUCCESSFUL", 420, 345, max_w=680, target_size=24, family="noto", fill="#34D399", bold=True)
+    _save_sprite(sprites, "code_terminal", im_t, out_dir, prefix)
+
+    # Programmer Stickman at Work
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="pointing_cta", accent_color="#10B981", ink=ink, head_fill=card_bg, seed=seed + 2)
+    _save_sprite(sprites, "coder_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "code_terminal", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 880, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "coder_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.1, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_dumbbell_gym_lift(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 403))
+    sprites: dict[str, Any] = {}
+
+    # Progressive Overload Meter Card
+    im_c, dc = _make_sprite(860, 360)
+    hand_rect(dc, 20, 20, 820, 320, seed=seed, lw=4, color=ink, fill=card_bg, r=20)
+    draw_fitted_text(dc, "PROGRESSIVE OVERLOAD", 430, 70, max_w=760, target_size=32, family="noto", fill=ACCENT_CORAL, bold=True)
+    draw_semantic_prop(dc, "dumbbell", 430, 190, 80, accent=ACCENT_CORAL, ink=ink, card_bg=card_bg, seed=seed)
+    draw_fitted_text(dc, "Daily Resistance • Consistent Adaption", 430, 290, max_w=760, target_size=24, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "overload_card", im_c, out_dir, prefix)
+
+    # Athlete Stickman
+    im_h, dh = _make_sprite(340, 460)
+    draw_stickman_figure(dh, 170, 80, scale=1.05, pose="climbing", accent_color=ACCENT_CORAL, ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "athlete_actor", im_h, out_dir, prefix)
+
+    # Health & Recovery Tag
+    im_rec, dr = _make_sprite(420, 130)
+    hand_rect(dr, 10, 10, 400, 110, seed=seed + 2, lw=3, color=ACCENT_GREEN, fill=soft_tint_bg(ACCENT_GREEN, 0.22, card_bg), r=16)
+    draw_semantic_prop(dr, "heart_pulse", 70, 65, 34, accent=ACCENT_GREEN, ink=ink, card_bg=card_bg, seed=seed)
+    draw_fitted_text(dr, "HYDRATION & REPAIR", 250, 65, max_w=280, target_size=22, family="noto", fill=ink, bold=True)
+    _save_sprite(sprites, "recovery_tag", im_rec, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "overload_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "athlete_actor", "anim": "pop_bounce", "cx0": 340, "cy0": 1140, "w": 340, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "recovery_tag", "anim": "slide_in", "cx0": 740, "cy0": 1200, "cx1": 740, "cy1": 1120, "w": 420, "from_f": 0.2, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_atom_quantum_orbit(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 404))
+    sprites: dict[str, Any] = {}
+
+    # Quantum Physics Orb Card
+    im_a, da = _make_sprite(860, 420)
+    hand_rect(da, 20, 20, 820, 380, seed=seed, lw=4, color="#38BDF8", fill=card_bg, r=20)
+    draw_fitted_text(da, "SUBATOMIC SCALE & QUANTUM ENTANGLEMENT", 430, 75, max_w=780, target_size=28, family="noto", fill="#0284C7", bold=True)
+    draw_semantic_prop(da, "atom", 430, 230, 100, accent="#38BDF8", ink=ink, card_bg=card_bg, seed=seed)
+    _save_sprite(sprites, "quantum_card", im_a, out_dir, prefix)
+
+    # Scientist Stickman
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="pondering", accent_color="#38BDF8", ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "scientist_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "quantum_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 720, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "scientist_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_stoic_pillar_stand(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 405))
+    sprites: dict[str, Any] = {}
+
+    # Stoic Ancient Pillars Card
+    im_p, dp = _make_sprite(860, 420)
+    hand_rect(dp, 20, 20, 820, 380, seed=seed, lw=4, color=ink, fill=card_bg, r=18)
+    draw_fitted_text(dp, "IMMOVABLE ROCK AGAINST THE STORM", 430, 70, max_w=760, target_size=30, family="noto", fill=ACCENT_GOLD, bold=True)
+    draw_semantic_prop(dp, "pillar", 250, 240, 80, accent=ACCENT_GOLD, ink=ink, card_bg=card_bg, seed=seed)
+    draw_semantic_prop(dp, "pillar", 610, 240, 80, accent=ACCENT_GOLD, ink=ink, card_bg=card_bg, seed=seed + 1)
+    draw_fitted_text(dp, "Control Internal Response • Endure Outside Events", 430, 350, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "stoic_card", im_p, out_dir, prefix)
+
+    # Peaceful Resolute Stickman
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="peaceful", accent_color=ACCENT_GOLD, ink=ink, head_fill=card_bg, seed=seed + 2)
+    _save_sprite(sprites, "stoic_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "stoic_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "stoic_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1140, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_compound_interest_snowball(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 406))
+    sprites: dict[str, Any] = {}
+
+    # Hockey stick compounding curve
+    im_c, dc = _make_sprite(860, 400)
+    hand_rect(dc, 20, 20, 820, 360, seed=seed, lw=4, color=ACCENT_GREEN, fill=card_bg, r=20)
+    draw_fitted_text(dc, "THE EXPONENTIAL SNOWBALL CURVE", 430, 70, max_w=760, target_size=32, family="noto", fill=ACCENT_GREEN, bold=True)
+    # Draw curve
+    curve_pts = [(80, 300), (280, 290), (460, 260), (620, 180), (760, 110)]
+    for i in range(len(curve_pts) - 1):
+        dc.line([curve_pts[i], curve_pts[i + 1]], fill=ACCENT_GREEN, width=6)
+    draw_fitted_text(dc, "Year 1-5: Boring Grind  →  Year 10+: Explosive Freedom", 430, 335, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "snowball_curve", im_c, out_dir, prefix)
+
+    # Investor Stickman pushing boulder
+    im_h, dh = _make_sprite(340, 440)
+    draw_stickman_figure(dh, 170, 80, scale=1.0, pose="sprinting", accent_color=ACCENT_GREEN, ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "snowball_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "snowball_curve", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "snowball_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 340, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_focus_pomodoro_timer(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 407))
+    sprites: dict[str, Any] = {}
+
+    # Giant Timer & Focus Dial
+    im_t, dt = _make_sprite(860, 400)
+    hand_rect(dt, 20, 20, 820, 360, seed=seed, lw=4, color=ACCENT_CORAL, fill=card_bg, r=20)
+    draw_fitted_text(dt, "UNINTERRUPTED DEEP FOCUS (25 MIN)", 430, 70, max_w=760, target_size=30, family="noto", fill=ACCENT_CORAL, bold=True)
+    draw_semantic_prop(dt, "timer", 430, 210, 85, accent=ACCENT_CORAL, ink=ink, card_bg=card_bg, seed=seed)
+    draw_fitted_text(dt, "Phone Muted • Clutter Eliminated • Single-Tasking", 430, 330, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "pomodoro_card", im_t, out_dir, prefix)
+
+    # Focused Stickman
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="shielding", accent_color=ACCENT_CORAL, ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "focus_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "pomodoro_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "focus_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_neural_net_synapse(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 408))
+    sprites: dict[str, Any] = {}
+
+    im_n, dn = _make_sprite(860, 420)
+    hand_rect(dn, 20, 20, 820, 380, seed=seed, lw=4, color="#38BDF8", fill=card_bg, r=20)
+    draw_fitted_text(dn, "NEURAL NETWORK & SYNAPSE ACCELERATION", 430, 70, max_w=760, target_size=28, family="noto", fill="#0284C7", bold=True)
+    # Draw neural nodes & edges
+    layers = [
+        [(150, 160), (150, 240), (150, 320)],
+        [(340, 180), (340, 260), (340, 340)],
+        [(520, 180), (520, 260), (520, 340)],
+        [(710, 210), (710, 290)],
+    ]
+    for li in range(len(layers) - 1):
+        for p1 in layers[li]:
+            for p2 in layers[li + 1]:
+                dn.line([p1, p2], fill="#CBD5E1", width=2)
+    for l in layers:
+        for p in l:
+            dn.ellipse([p[0] - 12, p[1] - 12, p[0] + 12, p[1] + 12], fill="#38BDF8", outline=ink, width=3)
+    _save_sprite(sprites, "neural_graph", im_n, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="pondering", accent_color="#38BDF8", ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "ai_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "neural_graph", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "ai_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_iceberg_hidden_depth(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 409))
+    sprites: dict[str, Any] = {}
+
+    im_i, di = _make_sprite(860, 440)
+    hand_rect(di, 20, 20, 820, 400, seed=seed, lw=4, color="#0284C7", fill=card_bg, r=20)
+    draw_fitted_text(di, "THE ICEBERG OF MASTERY", 430, 65, max_w=760, target_size=32, family="noto", fill="#0284C7", bold=True)
+    draw_semantic_prop(di, "iceberg", 430, 240, 100, accent="#0284C7", ink=ink, card_bg=card_bg, seed=seed)
+    draw_fitted_text(di, "10% What People See: Glory  |  90% Unseen Work: Sweat & Solitude", 430, 375, max_w=760, target_size=20, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "iceberg_card", im_i, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="pointing_cta", accent_color="#0284C7", ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "observer_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "iceberg_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "observer_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_hamster_wheel_break(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 410))
+    sprites: dict[str, Any] = {}
+
+    im_w, dw = _make_sprite(860, 400)
+    hand_rect(dw, 20, 20, 820, 360, seed=seed, lw=4, color=ACCENT_CORAL, fill=card_bg, r=20)
+    draw_fitted_text(dw, "BREAKING OUT OF THE RAT RACE", 430, 65, max_w=760, target_size=32, family="noto", fill=ACCENT_CORAL, bold=True)
+    # Large wheel outline
+    hand_circle(dw, 430, 210, 85, seed=seed, lw=5, color=ink, fill=None)
+    for ang in range(0, 360, 45):
+        rad = math.radians(ang)
+        dw.line([430, 210, 430 + int(math.cos(rad) * 85), 210 + int(math.sin(rad) * 85)], fill=accent, width=3)
+    draw_fitted_text(dw, "Endless Cycle Ended  →  Ownership & Autonomy", 430, 340, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "wheel_card", im_w, out_dir, prefix)
+
+    im_h, dh = _make_sprite(340, 440)
+    draw_stickman_figure(dh, 170, 80, scale=1.0, pose="sprinting", accent_color=ACCENT_CORAL, ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "leaper_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "wheel_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "leaper_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 340, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_chess_checkmate_move(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 411))
+    sprites: dict[str, Any] = {}
+
+    im_c, dc = _make_sprite(860, 400)
+    hand_rect(dc, 20, 20, 820, 360, seed=seed, lw=4, color=ACCENT_GOLD, fill=card_bg, r=20)
+    draw_fitted_text(dc, "GRANDMASTER STRATEGY: CHECKMATE", 430, 65, max_w=760, target_size=30, family="noto", fill=ACCENT_GOLD, bold=True)
+    draw_semantic_prop(dc, "chess", 430, 200, 80, accent=ACCENT_GOLD, ink=ink, card_bg=card_bg, seed=seed)
+    draw_fitted_text(dc, "Think Three Moves Ahead • Play the Long Game", 430, 335, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "chess_card", im_c, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="spotlight_crown", accent_color=ACCENT_GOLD, ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "master_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "chess_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "master_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_battery_supercharge(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 412))
+    sprites: dict[str, Any] = {}
+
+    im_b, db = _make_sprite(860, 400)
+    hand_rect(db, 20, 20, 820, 360, seed=seed, lw=4, color=ACCENT_GREEN, fill=card_bg, r=20)
+    draw_fitted_text(db, "RECHARGING TO 100% PEAK POWER", 430, 65, max_w=760, target_size=32, family="noto", fill=ACCENT_GREEN, bold=True)
+    draw_semantic_prop(db, "battery", 430, 200, 80, accent=ACCENT_GREEN, ink=ink, card_bg=card_bg, seed=seed)
+    draw_fitted_text(db, "Full Physical & Mental Energy Restored", 430, 335, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "battery_card", im_b, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="climbing", accent_color=ACCENT_GREEN, ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "charged_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "battery_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "charged_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_rocket_launchpad_stage(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 413))
+    sprites: dict[str, Any] = {}
+
+    im_r, dr = _make_sprite(860, 420)
+    hand_rect(dr, 20, 20, 820, 380, seed=seed, lw=4, color="#F59E0B", fill=card_bg, r=20)
+    draw_fitted_text(dr, "LAUNCH SEQUENCE: REACHING ESCAPE VELOCITY", 430, 65, max_w=780, target_size=28, family="noto", fill="#D97706", bold=True)
+    draw_semantic_prop(dr, "rocket", 430, 230, 95, accent="#F59E0B", ink=ink, card_bg=card_bg, seed=seed)
+    _save_sprite(sprites, "rocket_card", im_r, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="spotlight_crown", accent_color="#F59E0B", ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "commander_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "rocket_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "commander_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_scales_of_justice(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 414))
+    sprites: dict[str, Any] = {}
+
+    im_s, ds = _make_sprite(860, 400)
+    hand_rect(ds, 20, 20, 820, 360, seed=seed, lw=4, color=ink, fill=card_bg, r=20)
+    draw_fitted_text(ds, "SCALES OF TRUTH & REALITY", 430, 65, max_w=760, target_size=32, family="noto", fill=ACCENT_GOLD, bold=True)
+    # Fulcrum and pans
+    ds.line([430, 130, 430, 270], fill=ink, width=6)
+    ds.line([250, 160, 610, 200], fill=accent, width=6)
+    ds.polygon([(410, 310), (450, 310), (430, 270)], fill=ink)
+    # Left pan (Truth - heavy)
+    ds.line([250, 160, 220, 240], fill=ink, width=3)
+    ds.line([250, 160, 280, 240], fill=ink, width=3)
+    hand_rect(ds, 200, 240, 100, 20, seed=seed, lw=3, color=ink, fill=ACCENT_GREEN, r=6)
+    draw_fitted_text(ds, "FACTS", 250, 250, max_w=80, target_size=18, family="noto", fill=WHITE, bold=True)
+    # Right pan (Illusion - light)
+    ds.line([610, 200, 580, 260], fill=ink, width=3)
+    ds.line([610, 200, 640, 260], fill=ink, width=3)
+    hand_rect(ds, 560, 260, 100, 20, seed=seed + 1, lw=3, color=ink, fill=ACCENT_CORAL, r=6)
+    draw_fitted_text(ds, "NOISE", 610, 270, max_w=80, target_size=18, family="noto", fill=WHITE, bold=True)
+    _save_sprite(sprites, "scales_card", im_s, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="pointing_cta", accent_color=ACCENT_GOLD, ink=ink, head_fill=card_bg, seed=seed + 2)
+    _save_sprite(sprites, "judge_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "scales_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "judge_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_puzzle_assembly(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 415))
+    sprites: dict[str, Any] = {}
+
+    im_p, dp = _make_sprite(860, 400)
+    hand_rect(dp, 20, 20, 820, 360, seed=seed, lw=4, color="#1D70B8", fill=card_bg, r=20)
+    draw_fitted_text(dp, "THE MISSING PIECE SNAPS INTO PLACE", 430, 65, max_w=760, target_size=30, family="noto", fill="#1D70B8", bold=True)
+    # 2x2 Jigsaw Puzzle layout
+    pw = 120
+    for r_i in (0, 1):
+        for c_i in (0, 1):
+            px = 330 + c_i * (pw + 10)
+            py = 140 + r_i * (pw + 10)
+            is_gold = (r_i == 1 and c_i == 1)
+            fill_c = ACCENT_GOLD if is_gold else soft_tint_bg(accent, 0.2, card_bg)
+            hand_rect(dp, px, py, pw, pw, seed=seed + r_i * 2 + c_i, lw=3, color=ink, fill=fill_c, r=10)
+    draw_fitted_text(dp, "Everything Connects • Complete Pattern Revealed", 430, 345, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "puzzle_card", im_p, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="pondering", accent_color="#1D70B8", ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "solver_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "puzzle_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "solver_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_radar_scanner_sweep(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 416))
+    sprites: dict[str, Any] = {}
+
+    im_r, dr = _make_sprite(860, 420)
+    hand_rect(dr, 20, 20, 820, 380, seed=seed, lw=4, color="#10B981", fill="#0A1612", r=20)
+    draw_fitted_text(dr, "HIGH-VALUE TARGET ACQUISITION", 430, 65, max_w=760, target_size=30, family="noto", fill="#10B981", bold=True)
+    # Radar Grid
+    rcx, rcy = 430, 230
+    for rad in (40, 80, 120):
+        dr.ellipse([rcx - rad, rcy - rad, rcx + rad, rcy + rad], outline="#10B981", width=2)
+    dr.line([rcx - 130, rcy, rcx + 130, rcy], fill="#047857", width=2)
+    dr.line([rcx, rcy - 130, rcx, rcy + 130], fill="#047857", width=2)
+    # Sweep beam
+    dr.pieslice([rcx - 120, rcy - 120, rcx + 120, rcy + 120], 30, 75, fill="#065F46", outline="#34D399", width=2)
+    # Target Blip
+    dr.ellipse([rcx + 60, rcy - 50, rcx + 72, rcy - 38], fill="#F59E0B")
+    _save_sprite(sprites, "radar_screen", im_r, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="pointing_cta", accent_color="#10B981", ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "radar_operator", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "radar_screen", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "radar_operator", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_dna_evolution_spiral(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 417))
+    sprites: dict[str, Any] = {}
+
+    im_d, dd = _make_sprite(860, 400)
+    hand_rect(dd, 20, 20, 820, 360, seed=seed, lw=4, color="#8B5CF6", fill=card_bg, r=20)
+    draw_fitted_text(dd, "CELLULAR REPAIR & REWIRING", 430, 65, max_w=760, target_size=32, family="noto", fill="#8B5CF6", bold=True)
+    draw_semantic_prop(dd, "dna", 430, 200, 85, accent="#8B5CF6", ink=ink, card_bg=card_bg, seed=seed)
+    draw_fitted_text(dd, "Biological Adaptation at the Foundation", 430, 335, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "dna_card", im_d, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="peaceful", accent_color="#8B5CF6", ink=ink, head_fill=card_bg, seed=seed + 1)
+    _save_sprite(sprites, "evolved_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "dna_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "evolved_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_eisenhower_grid_sort(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 418))
+    sprites: dict[str, Any] = {}
+
+    im_m, dm = _make_sprite(860, 420)
+    hand_rect(dm, 20, 20, 820, 380, seed=seed, lw=4, color=ink, fill=card_bg, r=20)
+    draw_fitted_text(dm, "EISENHOWER 4-QUADRANT MATRIX", 430, 60, max_w=760, target_size=28, family="noto", fill=accent, bold=True)
+    # 4 Quadrants
+    dm.line([430, 100, 430, 370], fill=ink, width=4)
+    dm.line([50, 235, 810, 235], fill=ink, width=4)
+    # Q1: Do First (Red)
+    hand_rect(dm, 60, 110, 350, 110, seed=seed, lw=2, color=ACCENT_CORAL, fill=soft_tint_bg(ACCENT_CORAL, 0.15, card_bg), r=8)
+    draw_fitted_text(dm, "1. DO FIRST (Urgent+Important)", 235, 165, max_w=330, target_size=20, family="noto", fill=ACCENT_CORAL, bold=True)
+    # Q2: Schedule (Green)
+    hand_rect(dm, 450, 110, 350, 110, seed=seed + 1, lw=2, color=ACCENT_GREEN, fill=soft_tint_bg(ACCENT_GREEN, 0.15, card_bg), r=8)
+    draw_fitted_text(dm, "2. SCHEDULE (Not Urgent+Important)", 625, 165, max_w=330, target_size=20, family="noto", fill=ACCENT_GREEN, bold=True)
+    # Q3: Delegate (Yellow)
+    hand_rect(dm, 60, 250, 350, 110, seed=seed + 2, lw=2, color=ACCENT_GOLD, fill=soft_tint_bg(ACCENT_GOLD, 0.15, card_bg), r=8)
+    draw_fitted_text(dm, "3. DELEGATE (Urgent+Not Important)", 235, 305, max_w=330, target_size=20, family="noto", fill=ACCENT_GOLD, bold=True)
+    # Q4: Eliminate (Gray)
+    hand_rect(dm, 450, 250, 350, 110, seed=seed + 3, lw=2, color="#64748B", fill=soft_tint_bg("#64748B", 0.15, card_bg), r=8)
+    draw_fitted_text(dm, "4. ELIMINATE (Distractions)", 625, 305, max_w=330, target_size=20, family="noto", fill="#64748B", bold=True)
+    _save_sprite(sprites, "matrix_card", im_m, out_dir, prefix)
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose="pointing_cta", accent_color=accent, ink=ink, head_fill=card_bg, seed=seed + 4)
+    _save_sprite(sprites, "manager_actor", im_h, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "matrix_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "manager_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1150, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
+def _choreo_dynamic_synthesizer(scene: dict, accent: str, out_dir: Path, prefix: str) -> tuple[dict, list[dict], list[dict]]:
+    """Universal Dynamic Visual Synthesizer: Dynamically generates custom scenes matching ANY sentence."""
+    th = _theme_of(scene)
+    ink, card_bg = th["ink"], th["card_bg"]
+    seed = int(scene.get("variant_seed", 500))
+    sprites: dict[str, Any] = {}
+
+    narration = str(scene.get("narration", "")).strip()
+    headline = str(scene.get("scene_title", "CORE INSIGHT")).upper()
+    prop_kind = str(scene.get("prop_kind", "spark")).lower()
+    layout_mode = str(scene.get("layout_mode", "clean_stage"))
+
+    is_fem = bool(scene.get("speaker") == 2 or str(scene.get("speaker_name", "")).lower() in ("maya", "female"))
+
+    # Determine pose matched to semantic prop
+    pose = "pondering"
+    if prop_kind in ("bull", "coin", "crown", "chess"):
+        pose = "spotlight_crown"
+    elif prop_kind in ("dumbbell", "battery", "rocket"):
+        pose = "climbing"
+    elif prop_kind in ("code", "cpu", "radar"):
+        pose = "pointing_cta"
+    elif prop_kind in ("pillar", "sun", "dna"):
+        pose = "peaceful"
+    elif prop_kind in ("timer", "target"):
+        pose = "shielding"
+
+    im_h, dh = _make_sprite(320, 440)
+    draw_stickman_figure(dh, 160, 80, scale=1.0, pose=pose, accent_color=accent, ink=ink, head_fill=card_bg, seed=seed + 1, is_female=is_fem)
+    _save_sprite(sprites, "synth_actor", im_h, out_dir, prefix)
+
+    if layout_mode == "clean_stage":
+        # Clean Stage: Natural diorama without a heavy rectangular card box!
+        im_p, dp = _make_sprite(360, 360)
+        draw_semantic_prop(dp, prop_kind, 180, 180, 130, accent=accent, ink=ink, card_bg=card_bg, seed=seed)
+        _save_sprite(sprites, "synth_prop", im_p, out_dir, prefix)
+
+        sprite_plan = [
+            {"sprite": "synth_actor", "anim": "walk_to", "cx0": 340, "cy0": 1150, "cx1": 390, "cy1": 1150, "w": 380, "from_f": 0.0, "to_f": 1.0, "hops": 1},
+            {"sprite": "synth_prop", "anim": "pop_bounce", "cx0": 780, "cy0": 1050, "w": 340, "from_f": 0.15, "to_f": 1.0},
+        ]
+        return sprites, sprite_plan, []
+
+    # Other layout modes: Graphic insight banner card
+    im_c, dc = _make_sprite(860, 380)
+    hand_rect(dc, 20, 20, 820, 340, seed=seed, lw=4, color=accent, fill=card_bg, r=20)
+    draw_fitted_text(dc, headline, 430, 70, max_w=760, target_size=32, family="noto", fill=accent, bold=True)
+    draw_semantic_prop(dc, prop_kind, 430, 205, 80, accent=accent, ink=ink, card_bg=card_bg, seed=seed)
+    clean_sub = " ".join(narration.split()[:8])
+    if len(narration.split()) > 8:
+        clean_sub += "..."
+    draw_fitted_text(dc, clean_sub, 430, 315, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    _save_sprite(sprites, "synth_card", im_c, out_dir, prefix)
+
+    sprite_plan = [
+        {"sprite": "synth_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "synth_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1160, "w": 320, "from_f": 0.0, "to_f": 1.0},
+    ]
+    return sprites, sprite_plan, []
+
+
 _CHOREO_GENERATORS = {
     "question_burst": _choreo_question_burst,
     "phone_trap": _choreo_phone_trap,
@@ -1312,6 +2357,31 @@ _CHOREO_GENERATORS = {
     "mind_storm_calm": _choreo_mind_storm_calm,
     "idea_spark_build": _choreo_idea_spark_build,
     "two_path_fork": _choreo_two_path_fork,
+    "lighthouse_fog_beam": _choreo_lighthouse_fog_beam,
+    "dopamine_spike_chart": _choreo_dopamine_spike_chart,
+    "split_mirror_ideal": _choreo_split_mirror_ideal,
+    "pedestal_bust_trap": _choreo_pedestal_bust_trap,
+    "protective_couple_shield": _choreo_protective_couple_shield,
+    "notification_fishhook": _choreo_notification_fishhook,
+    "crypto_market_rally": _choreo_crypto_market_rally,
+    "terminal_code_deploy": _choreo_terminal_code_deploy,
+    "dumbbell_gym_lift": _choreo_dumbbell_gym_lift,
+    "atom_quantum_orbit": _choreo_atom_quantum_orbit,
+    "stoic_pillar_stand": _choreo_stoic_pillar_stand,
+    "compound_interest_snowball": _choreo_compound_interest_snowball,
+    "focus_pomodoro_timer": _choreo_focus_pomodoro_timer,
+    "neural_net_synapse": _choreo_neural_net_synapse,
+    "iceberg_hidden_depth": _choreo_iceberg_hidden_depth,
+    "hamster_wheel_break": _choreo_hamster_wheel_break,
+    "chess_checkmate_move": _choreo_chess_checkmate_move,
+    "battery_supercharge": _choreo_battery_supercharge,
+    "rocket_launchpad_stage": _choreo_rocket_launchpad_stage,
+    "scales_of_justice": _choreo_scales_of_justice,
+    "puzzle_assembly": _choreo_puzzle_assembly,
+    "radar_scanner_sweep": _choreo_radar_scanner_sweep,
+    "dna_evolution_spiral": _choreo_dna_evolution_spiral,
+    "eisenhower_grid_sort": _choreo_eisenhower_grid_sort,
+    "dynamic_synthesizer": _choreo_dynamic_synthesizer,
     "cta_celebration": _choreo_cta_celebration,
 }
 
@@ -1327,6 +2397,211 @@ class CISSceneIllustrator:
         self.mode = mode
         self.aspect_ratio = aspect_ratio
 
+    @classmethod
+    def _enrich_scene_composite(
+        cls,
+        comp: Image.Image,
+        scene: dict,
+        th: dict,
+        accent: str,
+        vector_plan: list[dict],
+        sprite_plan: list[dict],
+        sprites: dict[str, Any],
+        aspect_ratio: str = "9:16",
+    ) -> Image.Image:
+        """Composites dynamic topic-driven vector environment, semantic props, vectors & layout-tailored typography."""
+        w, h = comp.size
+        d = ImageDraw.Draw(comp)
+        seed = int(scene.get("variant_seed", 42))
+        floor_y = int(h * 0.74)
+        narr = (str(scene.get("narration", "")) + " " + str(scene.get("scene_title", "")) + " " + str(scene.get("choreography", ""))).lower()
+        layout_mode = str(scene.get("layout_mode", "clean_stage"))
+
+        # 1. Synthesize Unique Thematic Vector Environment from narration via AIBackgroundEngine
+        style_params = {
+            "fg": th["ink"],
+            "bg": th["paper_bg"],
+            "accent": accent,
+            "accent_secondary": th.get("accents", [accent, "#38BDF8"])[1 % len(th.get("accents", [accent, "#38BDF8"]))],
+            "line_width": max(2, int(w / 360)),
+        }
+        sid = "b3_dark" if th.get("is_dark") else "b1_light"
+        bg_rendered = False
+        try:
+            from engine.ai_background_engine import AIBackgroundEngine
+            AIBackgroundEngine.render_ai_background(
+                draw=d,
+                narration=narr,
+                scene_idx=int(scene.get("scene_id", 1)) - 1,
+                w=w,
+                h=h,
+                floor_y=floor_y,
+                style_params=style_params,
+                style_id=sid,
+            )
+            bg_rendered = True
+        except Exception as bg_err:
+            logger.debug("AI background engine fallback: %s", bg_err)
+
+        if not bg_rendered:
+            hand_line(d, 40, floor_y, w - 40, floor_y, seed=seed, lw=4, color=th["ink_muted"])
+            ground_wash = Image.new("RGBA", (w, h - floor_y), (*_hex_to_rgb(th["ink_faint"]), 16))
+            comp.alpha_composite(ground_wash, (0, floor_y))
+
+        # 2. Semantic Contextual Props via AssetLibrary & ProceduralObjectEngine (1,000+ Props)
+        try:
+            import re
+            from animation.assets import AssetLibrary
+            from engine.procedural_object_engine import ProceduralObjectEngine
+
+            asset_lib = AssetLibrary({"accent": accent, "fg": th["ink"], "line_width": 4})
+            words = set(re.findall(r"[a-z']+", narr))
+
+            # Determine open side based on hero sprite placement
+            hero_on_left = True
+            for sp in sprite_plan:
+                if sp.get("sprite") in ("hero", "synth_actor", "climber", "thinker"):
+                    cx = sp.get("cx0", 350)
+                    if cx > 550:
+                        hero_on_left = False
+                        break
+
+            px_x = int(w * 0.70) if hero_on_left else int(w * 0.10)
+            px_y = int(h * 0.28)
+
+            prop_rendered = False
+            # 2a. Check explicit prop planned by storyboard director
+            planned_prop = str(scene.get("prop_kind", "")).strip().lower()
+            if planned_prop and planned_prop not in ("spark", "none"):
+                asset_lib.render_asset_aa(comp, planned_prop.upper(), px_x, px_y, int(w * 0.24), int(h * 0.20), color=accent)
+                prop_rendered = True
+
+            # 2b. Check 1,000+ procedural catalog aliases
+            if not prop_rendered:
+                for word in words:
+                    if word in ProceduralObjectEngine.ALIASES:
+                        asset_name = ProceduralObjectEngine.ALIASES[word]
+                        if asset_name == "CAR":
+                            asset_lib.render_asset_aa(comp, "CAR", int(w * 0.60), int(h * 0.60), int(w * 0.34), int(h * 0.16), color=accent)
+                        elif asset_name == "TREE":
+                            asset_lib.render_asset_aa(comp, "TREE", int(w * 0.05), int(h * 0.44), int(w * 0.26), int(h * 0.32), color=accent)
+                        elif asset_name in ("COIN", "MONEY"):
+                            asset_lib.render_asset_aa(comp, "COIN", int(w * 0.08), px_y, int(w * 0.18), int(h * 0.18), color=accent)
+                            asset_lib.render_asset_aa(comp, "BAG", int(w * 0.72), px_y, int(w * 0.20), int(h * 0.20), color=accent)
+                        else:
+                            asset_lib.render_asset_aa(comp, asset_name, px_x, px_y, int(w * 0.24), int(h * 0.20), color=accent)
+                        prop_rendered = True
+                        break
+
+            # 2c. Fallback: Check direct procedural asset names
+            if not prop_rendered:
+                for word in words:
+                    if len(word) >= 4 and ProceduralObjectEngine.has_asset(word):
+                        asset_lib.render_asset_aa(comp, word.upper(), px_x, px_y, int(w * 0.24), int(h * 0.20), color=accent)
+                        prop_rendered = True
+                        break
+        except Exception as prop_err:
+            logger.debug("Scene enrichment prop exception: %s", prop_err)
+
+        # 3. Draw Hand-Drawn Vector Plan Elements
+        scale_to_comp = w / 1280.0
+        for vec in vector_plan:
+            k = vec.get("kind")
+            col = vec.get("color", th["ink"])
+            lw = max(2, int(vec.get("lw", 4) * scale_to_comp))
+            if k == "line":
+                p1 = vec.get("p1", [0, 0])
+                p2 = vec.get("p2", [w, 0])
+                hand_line(d, p1[0] * scale_to_comp, p1[1] * scale_to_comp, p2[0] * scale_to_comp, p2[1] * scale_to_comp, lw=lw, color=col)
+            elif k == "arrow":
+                x, y, aw = vec.get("x", 0), vec.get("y", 0), vec.get("w", 100)
+                sx, sy = x * scale_to_comp, y * scale_to_comp
+                ex = (x + aw) * scale_to_comp
+                hand_line(d, sx, sy, ex, sy, lw=lw, color=col)
+                d.polygon([(ex, sy), (ex - 20, sy - 12), (ex - 20, sy + 12)], fill=col)
+
+        # 4. Composite Sprites from sprite_plan
+        for sp in sprite_plan:
+            name = sp.get("sprite")
+            meta = sprites.get(name)
+            if not meta:
+                continue
+            try:
+                sp_img = Image.open(meta["path"]).convert("RGBA")
+                if "cx1" in sp:
+                    cx, cy = sp["cx1"], sp["cy1"]
+                elif "pts" in sp and sp["pts"]:
+                    cx, cy = sp["pts"][-1][0], sp["pts"][-1][1]
+                else:
+                    cx, cy = sp.get("cx0", 640), sp.get("cy0", 960)
+                tw = int(sp.get("w", meta["w"]) * scale_to_comp)
+                th_px = max(1, int(tw * sp_img.height / max(1, sp_img.width)))
+                resized = sp_img.resize((tw, th_px), Image.Resampling.LANCZOS)
+                px = int(cx * scale_to_comp - tw / 2)
+                py = int(cy * scale_to_comp - th_px / 2)
+                comp.alpha_composite(resized, (max(0, min(w - 1, px)), max(0, min(h - 1, py))))
+            except Exception:
+                pass
+
+        # 5. Non-Repetitive Layout-Driven Typography & Callouts
+        raw_title = str(scene.get("scene_title") or scene.get("beat_b_label") or "").strip().upper()
+
+        if raw_title and len(raw_title) > 2:
+            if layout_mode == "clean_stage":
+                # Clean Stage: No top banner box! Pure visual diorama where characters & art breathe freely.
+                pass
+            elif layout_mode == "split_screen":
+                # Split Screen: Subtle center comparison line with contrasting left/right topic badges
+                hand_line(d, w // 2, int(h * 0.16), w // 2, floor_y - 20, seed=seed, lw=3, color=th["ink_faint"])
+                left_lbl = str(scene.get("left_tag") or "BEFORE").upper()
+                right_lbl = str(scene.get("right_tag") or "AFTER").upper()
+                d.rounded_rectangle([int(w * 0.12), int(h * 0.08), int(w * 0.38), int(h * 0.08) + 52], radius=14, fill=th["card_bg"], outline=th["ink_muted"], width=2)
+                draw_fitted_text(d, left_lbl, int(w * 0.25), int(h * 0.08) + 26, max_w=int(w * 0.24), target_size=24, family="noto", fill=th["ink"], bold=True)
+                d.rounded_rectangle([int(w * 0.62), int(h * 0.08), int(w * 0.88), int(h * 0.08) + 52], radius=14, fill=th["card_bg"], outline=accent, width=2)
+                draw_fitted_text(d, right_lbl, int(w * 0.75), int(h * 0.08) + 26, max_w=int(w * 0.24), target_size=24, family="noto", fill=accent, bold=True)
+            elif layout_mode == "comic_beats":
+                # Comic Beats: Speech/thought cloud above the action beat
+                cb_w = min(int(w * 0.65), 580)
+                cb_h = 68
+                cx = (w - cb_w) // 2
+                cy = int(h * 0.10)
+                d.rounded_rectangle([cx, cy, cx + cb_w, cy + cb_h], radius=24, fill=th["card_bg"], outline=accent, width=3)
+                d.polygon([(cx + cb_w // 2 - 12, cy + cb_h), (cx + cb_w // 2 + 12, cy + cb_h), (cx + cb_w // 2, cy + cb_h + 16)], fill=th["card_bg"], outline=accent)
+                draw_fitted_text(d, f"💭 {raw_title}", cx + cb_w // 2, cy + cb_h // 2, max_w=cb_w - 40, target_size=28, family="caveat", fill=th["ink"], bold=True)
+            elif layout_mode == "floating_callout":
+                # Floating Callout: Lower-third pill leaving the entire upper screen completely open
+                badge_w = min(int(w * 0.72), 620)
+                badge_h = 60
+                bx = (w - badge_w) // 2
+                by = int(h * 0.78)
+                d.rounded_rectangle([bx, by, bx + badge_w, by + badge_h], radius=30, fill=th["card_bg"], outline=accent, width=2)
+                draw_fitted_text(d, f"✦  {raw_title}", bx + badge_w // 2, by + badge_h // 2, max_w=badge_w - 50, target_size=26, family="caveat", fill=accent, bold=True)
+            elif layout_mode == "editorial_spread":
+                # Editorial Spread: Minimalist unboxed typography in top corner
+                draw_fitted_text(d, f"✦  {raw_title}", int(w * 0.45), int(h * 0.06), max_w=int(w * 0.75), target_size=32, family="caveat", fill=accent, bold=True)
+            elif layout_mode == "big_typo_banner":
+                # Big Typo Banner: Bold impact card reserved for major climactic takeaways
+                badge_w = min(int(w * 0.82), 780)
+                badge_h = 80
+                bx = (w - badge_w) // 2
+                by = int(h * 0.055)
+                d.rounded_rectangle([bx + 4, by + 4, bx + badge_w + 4, by + badge_h + 4], radius=18, fill=(0, 0, 0, 35))
+                d.rounded_rectangle([bx, by, bx + badge_w, by + badge_h], radius=18, fill=th["card_bg"], outline=accent, width=3)
+                d.rounded_rectangle([bx, by, bx + 18, by + badge_h], radius=9, fill=accent)
+                draw_fitted_text(d, f"✦  {raw_title}", bx + badge_w // 2 + 8, by + badge_h // 2, max_w=badge_w - 60, target_size=34, family="caveat", fill=th["ink"], bold=True)
+
+        # 6. Dynamic Organic Particles Seeded Per-Scene
+        rng = mulberry32(seed)
+        particle_symbols = ["✦", "·", "✧", "°", "✦"]
+        for p_idx in range(5):
+            px = int(w * (0.10 + rng() * 0.80))
+            py = int(h * (0.12 + rng() * 0.60))
+            sym = particle_symbols[p_idx % len(particle_symbols)]
+            col = accent if p_idx % 2 == 0 else th["ink_muted"]
+            d.text((px, py), sym, fill=col, font=ImageFont.load_default(), anchor="mm")
+
+        return comp
+
     def illustrate(self, scene: dict, output_path: str) -> bool:
         out_p = Path(output_path)
         out_p.parent.mkdir(parents=True, exist_ok=True)
@@ -1340,6 +2615,127 @@ class CISSceneIllustrator:
 
         sprites, sprite_plan, vector_plan = gen(scene, accent, out_p.parent, prefix)
         th = _theme_of(scene)
+
+        # Contextual Semantic Procedural Prop from 1,025+ Object Catalog
+        try:
+            from engine.procedural_object_engine import ProceduralObjectEngine
+            import re
+
+            # Choreographies that already possess hand-crafted props or dual characters
+            BUILTIN_FOCAL_CHOREOS = {
+                "cta_celebration",
+                "split_mirror_ideal",
+                "two_path_fork",
+                "phone_trap",
+                "hourglass_sprint",
+                "dumbbell_gym_lift",
+                "terminal_code_deploy",
+                "crypto_market_rally",
+                "battery_supercharge",
+                "rocket_launchpad_stage",
+                "scales_of_justice",
+                "pedestal_bust_trap",
+                "bridge_cross",
+                "boundary_shield",
+                "tether_break",
+                "give_and_withdraw",
+                "scale_tipping",
+                "chess_checkmate_move",
+                "puzzle_assembly",
+                "radar_scanner_sweep",
+                "atom_quantum_orbit",
+                "compound_interest_snowball",
+                "focus_pomodoro_timer",
+                "staircase_climb",
+                "mirror_truth",
+                "protective_couple_shield",
+                "notification_fishhook",
+                "crowd_filter",
+                "split_cards_slide",
+                "magnet_orbit",
+            }
+
+            is_cta = bool(scene.get("is_cta", False)) or choreo == "cta_celebration"
+
+            # NEVER inject overlapping props onto CTA buttons or scenes with focal choreography
+            if not is_cta and choreo not in BUILTIN_FOCAL_CHOREOS:
+                seed = int(scene.get("variant_seed", 42))
+                narr_text = (str(scene.get("narration", "")) + " " + str(scene.get("scene_title", ""))).lower()
+                words = re.findall(r"[a-z']+", narr_text)
+
+                detected_prop: Optional[str] = None
+                planned = str(scene.get("prop_kind", "")).strip().lower()
+                if planned and planned not in ("spark", "none", "arrow", "line"):
+                    detected_prop = planned
+
+                if not detected_prop:
+                    for w in words:
+                        if w in ProceduralObjectEngine.ALIASES:
+                            detected_prop = ProceduralObjectEngine.ALIASES[w].lower()
+                            break
+
+                if not detected_prop:
+                    for w in words:
+                        if len(w) >= 4 and ProceduralObjectEngine.has_asset(w):
+                            detected_prop = w.lower()
+                            break
+
+                # If we found a semantic prop and it's not already in sprite_plan
+                if detected_prop and not any(detected_prop in sp.get("sprite", "").lower() for sp in sprite_plan):
+                    prop_slug = re.sub(r"[^a-z0-9]+", "_", detected_prop).strip("_")
+                    sp_name = f"prop_{prop_slug}"
+
+                    prop_sz = 280
+                    im_prop, d_prop = _make_sprite(prop_sz, prop_sz)
+                    drawn = ProceduralObjectEngine.draw_object(
+                        draw=d_prop,
+                        asset_name=detected_prop,
+                        x=20,
+                        y=20,
+                        w=prop_sz - 40,
+                        h=prop_sz - 40,
+                        color=accent,
+                        ink=th["ink"],
+                        line_width=4,
+                        seed=seed + sid * 31,
+                    )
+                    if drawn:
+                        # Collision detection test against existing sprites
+                        candidate_slots = [(760, 1150), (320, 1150), (760, 950), (320, 950), (540, 750)]
+                        safe_cx, safe_cy = None, None
+
+                        for cand_cx, cand_cy in candidate_slots:
+                            collides = False
+                            for sp in sprite_plan:
+                                s_name = sp.get("sprite", "")
+                                sp_cx = sp.get("cx0", 0)
+                                sp_cy = sp.get("cy0", 0)
+                                sp_w = sp.get("w", 300)
+                                sp_h = sprites.get(s_name, {}).get("h") if s_name in sprites else sp.get("h")
+                                if sp_h is None:
+                                    sp_h = 160 if ("pill" in s_name or "banner" in s_name) else min(sp_w, 360)
+                                min_dist_x = (prop_sz + sp_w) * 0.38
+                                min_dist_y = (prop_sz + sp_h) * 0.38
+                                if abs(cand_cx - sp_cx) < min_dist_x and abs(cand_cy - sp_cy) < min_dist_y:
+                                    collides = True
+                                    break
+                            if not collides:
+                                safe_cx, safe_cy = cand_cx, cand_cy
+                                break
+
+                        if safe_cx is not None:
+                            _save_sprite(sprites, sp_name, im_prop, out_p.parent, prefix)
+                            sprite_plan.append({
+                                "sprite": sp_name,
+                                "anim": "pop_bounce",
+                                "cx0": safe_cx,
+                                "cy0": safe_cy,
+                                "w": prop_sz,
+                                "from_f": 0.12,
+                                "to_f": 1.0,
+                            })
+        except Exception as prop_err:
+            logger.debug("Failed to inject semantic procedural prop sprite: %s", prop_err)
 
         # Optional local LCM DreamShaper illustrated scene backdrop
         if self.mode == "lcm" and choreo != "cta_celebration":
@@ -1393,7 +2789,7 @@ class CISSceneIllustrator:
             except Exception as exc:
                 logger.warning("LCM backdrop generation exception on scene %s: %s", sid, exc)
 
-        # Build composite fallback/preview PNG directly from sprites' final positions
+        # Build rich, multi-layered cinematic illustrated composite
         comp = Image.new("RGBA", (CANVAS_W, CANVAS_H), rgba(th["paper_bg"], 255))
         if "lcm_wash" in sprites:
             try:
@@ -1404,29 +2800,16 @@ class CISSceneIllustrator:
             except Exception:
                 pass
 
-        for sp in sprite_plan:
-            name = sp.get("sprite")
-            meta = sprites.get(name)
-            if not meta:
-                continue
-            try:
-                sp_img = Image.open(meta["path"]).convert("RGBA")
-                # Place using final stage coords scaled from 1280 -> 1080
-                scale_to_comp = CANVAS_W / 1280.0
-                if "cx1" in sp:
-                    cx, cy = sp["cx1"], sp["cy1"]
-                elif "pts" in sp and sp["pts"]:
-                    cx, cy = sp["pts"][-1][0], sp["pts"][-1][1]
-                else:
-                    cx, cy = sp.get("cx0", 640), sp.get("cy0", 960)
-                tw = int(sp.get("w", meta["w"]) * scale_to_comp)
-                th_px = max(1, int(tw * sp_img.height / max(1, sp_img.width)))
-                resized = sp_img.resize((tw, th_px), Image.Resampling.LANCZOS)
-                px = int(cx * scale_to_comp - tw / 2)
-                py = int(cy * scale_to_comp - th_px / 2)
-                comp.alpha_composite(resized, (max(0, min(CANVAS_W - 1, px)), max(0, min(CANVAS_H - 1, py))))
-            except Exception:
-                pass
+        comp = self._enrich_scene_composite(
+            comp=comp,
+            scene=scene,
+            th=th,
+            accent=accent,
+            vector_plan=vector_plan,
+            sprite_plan=sprite_plan,
+            sprites=sprites,
+            aspect_ratio=self.aspect_ratio,
+        )
 
         comp.save(output_path, "PNG")
 

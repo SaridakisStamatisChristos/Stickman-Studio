@@ -21,32 +21,41 @@ from PySide6.QtWidgets import (
 
 _CIS_PANEL_STYLE = """
 QFrame#cisCard {
-    background: #131A2B;
-    border: 1px solid #263248;
-    border-radius: 12px;
-    padding: 0px;
+    background: #0D1424;
+    border: 1px solid #1E2B45;
+    border-radius: 14px;
+    padding: 2px;
 }
 QLabel#cisTitle {
     color: #FB7185;
-    font-size: 12px;
-    font-weight: bold;
+    font-size: 13px;
+    font-weight: 800;
     background: transparent;
+}
+QLabel#cisBadge {
+    background: #2D1525;
+    color: #FDA4AF;
+    border: 1px solid #E11D48;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
 }
 QLabel#cisInfo {
     color: #94A3B8;
     font-size: 11px;
     line-height: 1.4;
-    background: #0B0F19;
-    border: 1px solid #1E293B;
+    background: #070B14;
+    border: 1px solid #162034;
     border-radius: 8px;
-    padding: 8px;
+    padding: 8px 10px;
 }
 QLabel#cisSectionLabel {
     color: #38BDF8;
     font-size: 11px;
-    font-weight: bold;
+    font-weight: 700;
     background: transparent;
-    margin-top: 2px;
+    margin-top: 4px;
 }
 QLabel#cisSubLabel {
     color: #94A3B8;
@@ -54,36 +63,36 @@ QLabel#cisSubLabel {
     background: transparent;
 }
 QPushButton#cisAccentBtn {
-    border: 1px solid #263248;
-    border-radius: 7px;
-    padding: 4px 2px;
-    font-size: 10px;
-    font-weight: bold;
+    border: 1px solid #202D44;
+    border-radius: 8px;
+    padding: 6px 4px;
+    font-size: 11px;
+    font-weight: 600;
     color: white;
     min-width: 0px;
 }
 QPushButton#cisAccentBtn:checked {
-    border: 2px solid white;
+    border: 2px solid #FFFFFF;
 }
 QPushButton#cisAccentBtn:hover {
     border-color: #E2E8F0;
 }
 QComboBox, QLineEdit {
-    background: #1B2336;
-    border: 1px solid #263248;
-    border-radius: 7px;
+    background: #111A2E;
+    border: 1px solid #202E48;
+    border-radius: 8px;
     color: #E2E8F0;
-    padding: 5px 8px;
+    padding: 6px 10px;
     font-size: 11px;
     min-width: 0px;
 }
 QComboBox:hover, QLineEdit:focus { border-color: #FB7185; }
 QComboBox::drop-down { border: none; width: 20px; }
 QComboBox QAbstractItemView {
-    background: #131A2B;
+    background: #0D1424;
     color: #E2E8F0;
-    border: 1px solid #263248;
-    border-radius: 7px;
+    border: 1px solid #202B45;
+    border-radius: 8px;
     selection-background-color: #F43F5E;
     outline: none;
 }
@@ -95,10 +104,10 @@ QCheckBox {
     min-width: 0px;
 }
 QFrame#cisCtaBox {
-    background: #0D1117;
-    border: 1px solid #21262D;
-    border-radius: 8px;
-    padding: 0px;
+    background: #090E1A;
+    border: 1px solid #182236;
+    border-radius: 10px;
+    padding: 2px;
 }
 """
 
@@ -155,6 +164,11 @@ class CISModePanel(QWidget):
         title_lbl = QLabel("Cinematic Illustrated Mode")
         title_lbl.setObjectName("cisTitle")
         title_row.addWidget(title_lbl)
+
+        badge_lbl = QLabel("1,000+ Vectors")
+        badge_lbl.setObjectName("cisBadge")
+        title_row.addWidget(badge_lbl)
+
         title_row.addStretch()
         v.addLayout(title_row)
 
@@ -210,10 +224,19 @@ class CISModePanel(QWidget):
 
         self._visual_style_combo = QComboBox()
         self._visual_style_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self._visual_style_combo.addItem("✨ Auto (Mix + Custom Styles)", "auto")
-        self._visual_style_combo.addItem("📓 Classic Sketchbook (B1 Ink)", "B1")
-        self._visual_style_combo.addItem("📰 Editorial Poster (B2 Cream)", "B2")
-        self._visual_style_combo.addItem("🌌 Dark Chalkboard (B3 Neon)", "B3")
+        self._visual_style_combo.addItem("✨ Auto (1000+ Multi-Domain Visuals)", "auto")
+        self._visual_style_combo.addItem("💼 Wealth, Finance & Business", "wealth_business")
+        self._visual_style_combo.addItem("💻 Tech, Coding & AI Systems", "tech_coding_ai")
+        self._visual_style_combo.addItem("🏋️ Fitness, Health & Athletics", "fitness_health_bio")
+        self._visual_style_combo.addItem("🏛️ Stoicism, Philosophy & History", "stoicism_philosophy_history")
+        self._visual_style_combo.addItem("⚡ Habits, Focus & Productivity", "habits_productivity_focus")
+        self._visual_style_combo.addItem("🚀 Motivation & Mental Toughness", "motivation_mindset_leadership")
+        self._visual_style_combo.addItem("🌌 Science, Space & Cosmos", "science_space_nature")
+        self._visual_style_combo.addItem("🎭 Relatable Daily Life & Comedy", "comedy_daily_relatable")
+        self._visual_style_combo.addItem("🧠 Dark Psychology & Behavior", "psychology_human_behavior")
+        self._visual_style_combo.addItem("📓 Classic White Sketchbook (B1 Ink)", "B1")
+        self._visual_style_combo.addItem("📰 Warm Editorial (B2 Cream)", "B2")
+        self._visual_style_combo.addItem("🌌 Obsidian Dark Chalkboard (B3 Neon)", "B3")
         self._visual_style_combo.setCurrentIndex(0)
         self._visual_style_combo.currentIndexChanged.connect(self._on_settings_changed)
         v.addWidget(self._visual_style_combo)

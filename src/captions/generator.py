@@ -224,4 +224,12 @@ class CaptionGenerator:
 
     @staticmethod
     def _normalize_text(text: str) -> str:
-        return re.sub(r"\s+", " ", text.lower().strip())
+        # Strip speaker labels e.g. "Male Voice:", "Alex:", "Speaker 1:"
+        t = re.sub(
+            r"^\s*(?:\*\*)?(?:\[)?(?:alex|maya|speaker\s*\d+|voice\s*\d+|male\s*voice|female\s*voice|male|female)(?:\])?(?:\s*\([^)]*\))?(?:\*\*)?\s*[:\-–—]\s*",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+        t = re.sub(r"[^\w\s]", "", t.lower())
+        return " ".join(t.split())

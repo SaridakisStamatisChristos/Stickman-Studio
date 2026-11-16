@@ -140,6 +140,7 @@ class AudioMixer:
                 + [
                     "-filter_complex", filtergraph,
                     "-map", "[out]",
+                    "-t", f"{total_duration:.4f}",
                     "-ar", "44100",
                     "-ac", "1",
                     "-c:a", "pcm_s16le",
@@ -324,46 +325,78 @@ class AudioMixer:
             logger.warning("build_composite_sfx_track failed: %s", exc)
             return False
 
-    def add_silence(self, duration: float, output_path: str) -> bool:
-        """Generate a silent WAV file of *duration* seconds."""
+    def get_sample_rate(self, audio_path: str) -> int:
+        """Return audio sample rate in Hz using ffprobe, defaulting to 24000."""
+        try:
+            result = subprocess.run(
+                [
+                    self.ffprobe_path,
+                    "-v", "error",
+                    "-select_streams", "a:0",
+                    "-show_entries", "stream=sample_rate",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    audio_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            val = int(result.stdout.strip())
+            return val if val > 0 else 24000
+        except Exception:
+            return 24000
+
+    def add_silence(self, duration: float, output_path: str, sample_rate: int = 24000) -> bool:
+        """Generate a silent WAV file of *duration* seconds with matching sample rate."""
         cmd = [
             self.ffmpeg_path, "-y",
             "-f", "lavfi",
-            "-i", f"anullsrc=r=44100:cl=mono",
+            "-i", f"anullsrc=r={sample_rate}:cl=mono",
             "-t", f"{duration:.4f}",
+            "-ar", str(sample_rate),
+            "-ac", "1",
             "-c:a", "pcm_s16le",
             output_path,
         ]
         return self._run(cmd, f"silence {duration:.1f}s → {os.path.basename(output_path)}")
 
     def pad_audio_to_duration(self, input_path: str, output_path: str, target_duration: float) -> bool:
-        """Extend *input_path* with silence so the output is at least *target_duration* seconds.
-
-        This prevents FFmpeg from truncating video when audio is shorter than visual frames.
-        If the input is already long enough, it is copied as-is.
-        """
+        """Extend or trim *input_path* so the output is exactly *target_duration* seconds."""
         current_dur = self.get_duration(input_path)
-        if current_dur >= target_duration - 0.05:
-            # Already long enough — just copy
-            import shutil as _shutil
-            try:
-                _shutil.copy2(input_path, output_path)
-                return True
-            except Exception as exc:
-                logger.error("pad_audio_to_duration copy failed: %s", exc)
-                return False
+        sr = self.get_sample_rate(input_path)
+        if abs(current_dur - target_duration) < 0.04:
+            if os.path.abspath(input_path) != os.path.abspath(output_path):
+                import shutil as _shutil
+                try:
+                    _shutil.copy2(input_path, output_path)
+                except Exception as exc:
+                    logger.error("pad_audio_to_duration copy failed: %s", exc)
+                    return False
+            return True
 
-        pad_secs = max(0.1, target_duration - current_dur + 0.3)
-        cmd = [
-            self.ffmpeg_path, "-y",
-            "-i", input_path,
-            "-af", f"apad=pad_dur={pad_secs:.4f}",
-            "-t", f"{target_duration + 0.3:.4f}",
-            "-c:a", "pcm_s16le",
-            "-ar", "44100",
-            "-ac", "1",
-            output_path,
-        ]
+        if current_dur < target_duration:
+            pad_secs = max(0.01, target_duration - current_dur)
+            cmd = [
+                self.ffmpeg_path, "-y",
+                "-i", input_path,
+                "-af", f"apad=pad_dur={pad_secs:.4f}",
+                "-t", f"{target_duration:.4f}",
+                "-c:a", "pcm_s16le",
+                "-ar", str(sr),
+                "-ac", "1",
+                output_path,
+            ]
+        else:
+            cmd = [
+                self.ffmpeg_path, "-y",
+                "-i", input_path,
+                "-t", f"{target_duration:.4f}",
+                "-c:a", "pcm_s16le",
+                "-ar", str(sr),
+                "-ac", "1",
+                output_path,
+            ]
         return self._run(cmd, f"pad_audio {current_dur:.1f}s→{target_duration:.1f}s")
 
     # ------------------------------------------------------------------

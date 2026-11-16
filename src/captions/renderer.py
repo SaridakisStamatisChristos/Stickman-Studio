@@ -131,9 +131,9 @@ class CaptionRenderer:
             text = text.upper()
 
         font_scale: float = float(caption_event.get("font_scale", 1.0))
-        # Auto-clamp font size smoothly to canvas aspect ratio so captions never balloon
-        max_auto_size = max(16, int(min(self.width, self.height) * 0.068))
-        font_size = max(12, min(int(self.base_font_size * font_scale), max_auto_size))
+        # Auto-scale font size smoothly to canvas dimensions for crisp readability on mobile
+        target_auto_size = max(18, int(min(self.width, self.height) * 0.046))
+        font_size = max(16, min(int(max(self.base_font_size, target_auto_size) * font_scale), int(min(self.width, self.height) * 0.068)))
         font = self.load_font(font_size)
 
         safe_x1, safe_y1, safe_x2, safe_y2 = self.get_safe_area()
@@ -185,20 +185,16 @@ class CaptionRenderer:
         if pos == "center":
             return max(safe_y1, (self.height - total_h) // 2)
         if pos == "bottom":
-            return max(safe_y1, safe_y2 - total_h - 14)
+            # On 9:16 portrait video, place comfortably at ~0.80-0.83 * H above social media UI buttons
+            target_bottom = int(self.height * 0.81)
+            return max(safe_y1, min(safe_y2 - total_h - 10, target_bottom - total_h // 2))
 
         # AUTO SMART SAFE POSITION:
         # Characters stand with feet at floor_y = 0.74 * H.
-        # On 9:16 vertical, Instagram safe bottom is ~0.875 * H (leaving clean band 0.76..0.87 * H!).
-        # Center vertically inside the free stage band between floor_y and safe_y2!
-        floor_y = int(self.height * 0.745)
-        band_top = floor_y + max(8, int(self.height * 0.015))
-        band_bot = safe_y2
-        if (band_bot - band_top) >= total_h + 10:
-            # Sweet spot centered right below stickman feet and cleanly above UI chrome!
-            return band_top + ((band_bot - band_top) - total_h) // 2
-        # On narrow/short heights or CLOSE zoom shots, hug cleanly above safe_y2
-        return max(safe_y1, safe_y2 - total_h - max(8, int(self.height * 0.015)))
+        # Instagram/TikTok safe bottom is ~0.875 * H.
+        # Center vertically inside the prime visual band right below stickman action:
+        target_auto_y = int(self.height * 0.805)
+        return max(safe_y1, min(safe_y2 - total_h - 10, target_auto_y - total_h // 2))
 
     def _measure_lines_width(self, lines: list[str], font) -> int:
         max_w = 0
@@ -280,7 +276,12 @@ class CaptionRenderer:
     ) -> Image.Image:
         words: list[dict] = caption_event.get("words", [])
         if not words:
-            return frame
+            text = str(caption_event.get("text", "")).strip()
+            if uppercase:
+                text = text.upper()
+            max_w = int((safe_x2 - safe_x1) * 0.90)
+            lines = self._wrap_text(text, font, max_w)
+            return self._render_normal(frame, lines, font, font_size, safe_x1, safe_x2, safe_y1, safe_y2, caption_event)
 
         active_idx = -1
         for idx, w in enumerate(words):
@@ -460,13 +461,14 @@ class CaptionRenderer:
     ) -> None:
         outline_rgb = self._hex_to_rgb(outline_color)
         text_rgb = self._hex_to_rgb(color)
+        eff_stroke = max(1, min(int(outline_width), 3))
         try:
             draw.text(
                 (x, y),
                 text,
                 font=font,
                 fill=(*text_rgb, 255),
-                stroke_width=max(1, outline_width),
+                stroke_width=eff_stroke,
                 stroke_fill=(*outline_rgb, 255),
                 anchor="mm",
             )

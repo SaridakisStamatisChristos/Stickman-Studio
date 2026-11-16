@@ -29,6 +29,7 @@ from audio.sfx_synth import SFXSynth
 from captions.generator import CaptionGenerator
 from captions.renderer import CaptionRenderer
 from engine.scene_planner import ScenePlanner
+from engine.timeline_manager import CentralTimelineManager
 from styles.style_packs import resolve_style_pack
 from video.encoder import VideoEncoder
 
@@ -151,20 +152,23 @@ class VideoPipeline:
         fade_in: float = float(params.get("fade_in", 0.5))
         fade_out: float = float(params.get("fade_out", 0.5))
 
-        caption_style: str = str(params.get("caption_style", "bold_social"))
+        caption_style: str = str(params.get("caption_style") or "bold_social")
         caption_font_size: int = int(params.get("caption_font_size", 38))
         caption_position: str = str(params.get("caption_position", "auto")) or "auto"
-        caption_highlight: str = str(params.get("caption_highlight_color", ""))
+        caption_highlight: str = str(params.get("caption_highlight_color", "") or params.get("caption_highlight", ""))
         caption_font_name: str = str(params.get("caption_font_name", ""))
 
         use_lcm: bool = bool(params.get("use_lcm", False))
         unload_llm: bool = bool(params.get("unload_llm", True))
 
         width, height = get_video_dimensions(fmt, resolution=resolution, preview=preview_mode)
+        # Social media caption scaling with readable typography floors
         if preview_mode:
-            caption_font_size = max(14, int(caption_font_size * (width / 1080.0) * 1.15))
+            caption_font_size = max(20, int(height * 0.034))
         elif "720" in resolution:
-            caption_font_size = max(18, int(caption_font_size * 0.72))
+            caption_font_size = max(34, int(height * 0.030))
+        else:
+            caption_font_size = max(46, int(height * 0.027))
 
         self._encoder.use_hardware = use_hw
         self._encoder._nvenc_available = None  # refresh if setting toggled
@@ -213,72 +217,131 @@ class VideoPipeline:
             report("Understanding script", 10)
 
             # ==============================================================
-            # STAGE 2 – Planning scenes (10-25%)
+            # STAGE 2 + 3 – Intelligent Script Understanding & Audio-First Visual Sync (10-45%)
             # ==============================================================
-            report("Planning scenes", 12)
+            report("Understanding script & pacing", 12)
             if self._cancel_check():
                 return None
 
-            log(f"Planning scenes ({target_duration}s, {style}, {fmt})...")
-            scenes = self._scene_planner.plan_scenes(
-                script=script,
-                topic=topic,
-                duration=target_duration,
-                style=style,
-                format=fmt,
+            from engine.script_intelligence import ScriptIntelligenceEngine
+            from engine.quality_control import QualityControlValidator
+
+            s1_cfg = params.get("speaker1", {})
+            s2_cfg = params.get("speaker2", {})
+            n1 = str(s1_cfg.get("name", "Alex")).strip()
+            n2 = str(s2_cfg.get("name", "Maya")).strip()
+
+            log("Extracting story beats and clean dialogue...")
+            story_beats = ScriptIntelligenceEngine.parse_script_to_story_beats(
+                raw_script=script,
+                name1=n1,
+                name2=n2,
             )
-            if not scenes:
-                log("Error: scene planning produced no scenes.")
+
+            if not story_beats:
+                log("Error: No narrative beats could be extracted from script.")
                 return None
 
-            scenes = self._adjust_scene_durations(scenes, target_duration)
+            log(f"Extracted {len(story_beats)} clean narrative beats. Synthesizing synchronized audio...")
+            report("Generating narration", 25)
+
+            # Synthesize narration beat-by-beat FIRST to get exact audio duration
+            tts_dir = run_temp / "tts"
+            tts_dir.mkdir(parents=True, exist_ok=True)
+            sentence_audio: list[dict] = []
+            scenes: list[dict] = []
+            global_time = 0.0
+
+            total_beats = len(story_beats)
+            for b_idx, beat in enumerate(story_beats):
+                if self._cancel_check():
+                    return None
+
+                spk = beat.get("speaker", 1)
+                spk_name = beat.get("speaker_name", n1)
+                clean_text = beat.get("narration", "")
+
+                # Voice selection
+                if spk == 2 or spk_name.lower() in ("maya", "female"):
+                    eff_voice = s2_cfg.get("voice_id") or "af_heart"
+                    eff_speed = float(s2_cfg.get("speed") or voice_speed or 1.0)
+                    eff_pitch = float(s2_cfg.get("pitch", 0.0))
+                else:
+                    eff_voice = s1_cfg.get("voice_id") or voice_id or "am_adam"
+                    eff_speed = float(s1_cfg.get("speed") or voice_speed or 1.0)
+                    eff_pitch = float(s1_cfg.get("pitch", voice_pitch))
+
+                out_wav = str(tts_dir / f"beat_{b_idx:03d}.wav")
+                synth_path = self.tts_manager.synthesize(
+                    text=clean_text,
+                    voice_id=eff_voice,
+                    speed=eff_speed,
+                    pitch=eff_pitch,
+                    output_path=out_wav,
+                )
+                dur = self.tts_manager.get_audio_duration(synth_path) if synth_path else self.tts_manager.estimate_duration(clean_text, eff_speed)
+
+                if synth_path and params.get("acoustic_mastering", True) and hasattr(self.tts_manager, "apply_acoustic_mastering"):
+                    self.tts_manager.apply_acoustic_mastering(synth_path, synth_path)
+
+                sentence_audio.append({
+                    "text": clean_text,
+                    "path": synth_path,
+                    "duration": dur,
+                    "start_time": global_time,
+                })
+
+                # Now plan the visual scene with EXACT audio duration!
+                scene_dur = round(max(dur + 0.12, 1.2), 3)
+                sc = ScriptIntelligenceEngine.plan_visual_for_beat(
+                    beat=beat,
+                    context_history=scenes,
+                    duration=scene_dur,
+                )
+                sc["_audio_path"] = synth_path
+                sc["_audio_duration"] = dur
+                sc["_scene_start_time"] = global_time
+                sc["scene_id"] = b_idx + 1
+                scenes.append(sc)
+
+                global_time += scene_dur
+                frac = (b_idx + 1) / total_beats
+                report("Generating narration", 25 + int(frac * 20))
+
+            # Authoritative Central Timeline Orchestration (0ms drift locked)
+            timeline_mgr = CentralTimelineManager(fps=fps)
+            timeline_mgr.register_scenes(scenes)
+            for b_idx, entry in enumerate(sentence_audio):
+                timeline_mgr.record_audio(b_idx, entry["path"], entry["duration"], clean_text=entry["text"])
+            total_duration = timeline_mgr.compute_timeline(default_gap=0.12, min_scene_duration=1.2)
+
+            log(f"Narration synthesized for {len(scenes)} scenes ({total_duration:.1f}s total).")
+
+            # Apply Smart Video Director for dynamic camera cuts and visual pacing
             try:
                 from engine.smart_video_director import SmartVideoDirector
                 scenes = SmartVideoDirector.direct_storyboard(scenes)
-                log("Smart Video Director: applied dynamic camera cuts, kinetic badges & visual FX.")
+                log("Smart Video Director: applied dynamic camera cuts & kinetic staging.")
             except Exception as e:
                 logger.warning("SmartVideoDirector application skipped: %s", e)
-            log(f"Planned {len(scenes)} visual scenes.")
-            report("Planning scenes", 25)
 
-            # Unload LLM right after planning to free VRAM/RAM for TTS & rendering
-            if unload_llm:
-                self._unload_llm()
-
-            # ==============================================================
-            # STAGE 3 – Generating narration / TTS (25-45%)
-            # ==============================================================
-            report("Generating narration", 26)
-            if self._cancel_check():
-                return None
-
-            if auto_voice_speed:
-                try:
-                    from tts.tts_manager import compute_auto_voice_speed
-                    voice_speed = compute_auto_voice_speed(script, target_duration=float(target_duration))
-                    log(f"Auto Voice Speed calculated: {voice_speed:.2f}x for {target_duration}s target.")
-                except Exception:
-                    pass
-
-            log("Synthesizing offline narration sentence by sentence...")
-            sentence_audio, scenes = self._synthesise_narration(
+            # Pre-Export Quality Control Inspection & Auto-Repair
+            qc_ok, scenes, qc_logs = QualityControlValidator.validate_and_repair(
                 scenes=scenes,
-                voice_id=voice_id,
-                voice_speed=voice_speed,
-                voice_pitch=voice_pitch,
-                tts_dir=run_temp / "tts",
-                report_fn=lambda frac: report("Generating narration", 26 + int(frac * 19)),
+                sentence_audio=sentence_audio,
+                speaker1_name=n1,
+                speaker2_name=n2,
             )
+            for ql in qc_logs:
+                log(f"[QualityControl] {ql}")
 
-            # Compute total_duration from ACTUAL TTS audio (after TTS runs),
-            # not from pre-estimated scene durations. This prevents frame-count
-            # mismatches and video truncation.
-            total_duration = sum(float(s.get("duration", 0.0)) for s in scenes)
-            if total_duration <= 0:
-                total_duration = float(target_duration)
-            # Add a small tail padding so the video never cuts before the last frame
-            total_duration = round(total_duration + 0.15, 3)
-            log(f"Narration complete ({total_duration:.1f}s total).")
+            # Pre-Render Integrity & Sanitation Check
+            pre_ok, pre_issues = timeline_mgr.validate_pre_render(width=width, height=height)
+            for iss in pre_issues:
+                log(f"[Pre-Render Check] {iss}")
+
+            total_duration = timeline_mgr.total_duration
+            log(f"Narration complete ({total_duration:.1f}s total, 0ms drift locked).")
             report("Generating narration", 45)
 
             # ==============================================================
@@ -302,6 +365,7 @@ class VideoPipeline:
                 total_duration=total_duration,
                 audio_dir=run_temp / "audio",
                 style_id=style,
+                timeline_manager=timeline_mgr,
             )
             report("Mixing audio", 58)
 
@@ -315,9 +379,8 @@ class VideoPipeline:
             caption_events: list[dict] = []
             caption_renderer: Optional[CaptionRenderer] = None
             if caption_style and caption_style != "none":
-                caption_events = self._caption_generator.generate_captions(
-                    scenes=scenes,
-                    sentence_audio=sentence_audio,
+                caption_events = timeline_mgr.generate_synchronized_captions(
+                    caption_generator=self._caption_generator,
                     style=caption_style,
                 )
                 caption_renderer = CaptionRenderer(
@@ -331,6 +394,7 @@ class VideoPipeline:
                     style_id=style,
                     style_variant=style_variant,
                 )
+                log(f"Configured CaptionRenderer: style='{caption_style}', size={caption_font_size}px, events={len(caption_events)}")
 
             timestamp = int(time.time())
             safe_topic = "".join(c if c.isalnum() or c in "-_ " else "_" for c in topic).strip()[:40] or "video"
@@ -419,6 +483,12 @@ class VideoPipeline:
             # STAGE 8 – Quality Validation (98-100%)
             # ==============================================================
             report("Validating output", 99)
+            if timeline_mgr:
+                sync_ok, sync_report, stats = timeline_mgr.audit_post_render(
+                    video_path=output_path,
+                    expected_duration=total_duration,
+                    log_fn=log,
+                )
             validation_ok, validation_msg = self._validate_output(
                 output_path=output_path,
                 expected_duration=total_duration,
@@ -490,11 +560,20 @@ class VideoPipeline:
         voice_pitch: float,
         tts_dir: Path,
         report_fn: Callable[[float], None],
+        dialogue_mode: bool = False,
+        speaker1_cfg: Optional[dict] = None,
+        speaker2_cfg: Optional[dict] = None,
+        acoustic_mastering: bool = True,
     ) -> tuple[list[dict], list[dict]]:
         tts_dir.mkdir(parents=True, exist_ok=True)
         all_sentence_audio: list[dict] = []
         global_time = 0.0
         total_scenes = max(1, len(scenes))
+
+        s1_cfg = speaker1_cfg or {}
+        s2_cfg = speaker2_cfg or {}
+        n1 = str(s1_cfg.get("name", "Alex")).strip().lower()
+        n2 = str(s2_cfg.get("name", "Maya")).strip().lower()
 
         for scene_idx, scene in enumerate(scenes):
             if self._cancel_check():
@@ -507,13 +586,57 @@ class VideoPipeline:
             if not sentences:
                 sentences = [narration]
 
-            entries = self.tts_manager.synthesize_sentences(
-                sentences=sentences,
-                voice_id=voice_id,
-                speed=voice_speed,
-                pitch=voice_pitch,
-                output_dir=str(tts_dir / f"scene_{scene_idx:03d}"),
-            )
+            entries: list[dict] = []
+            for s_idx, sentence in enumerate(sentences):
+                # Detect speaker if in dialogue mode
+                eff_voice = voice_id
+                eff_speed = voice_speed
+                eff_pitch = voice_pitch
+
+                clean_text = sentence
+                if dialogue_mode:
+                    low_s = sentence.lower()
+                    is_s2 = (
+                        scene.get("speaker") == 2
+                        or str(scene.get("speaker_name", "")).lower() == n2
+                        or any(low_s.startswith(p) for p in (f"{n2}:", f"[{n2}]", f"**{n2}:", "speaker 2:", "female:", "female voice"))
+                        or "female voice" in low_s
+                    )
+                    if is_s2:
+                        eff_voice = s2_cfg.get("voice_id") or "blend:female_warm"
+                        eff_speed = float(s2_cfg.get("speed") or voice_speed or 1.0)
+                        eff_pitch = float(s2_cfg.get("pitch", 0.0))
+                    else:
+                        eff_voice = s1_cfg.get("voice_id") or voice_id
+                        eff_speed = float(s1_cfg.get("speed") or voice_speed or 1.0)
+                        eff_pitch = float(s1_cfg.get("pitch", voice_pitch))
+
+                    clean_text = re.sub(
+                        rf"^\s*(?:\*\*)?(?:\[)?(?:{re.escape(n1)}|{re.escape(n2)}|speaker\s*1|speaker\s*2|voice\s*1|voice\s*2|male\s*voice|female\s*voice|male|female|final\s*line\s*[-–—]\s*(?:female|male)\s*voice)(?:\])?(?:\s*\([^)]*\))?(?:\*\*)?\s*[:\-–—]\s*",
+                        "",
+                        sentence,
+                        flags=re.IGNORECASE,
+                    ).strip()
+                    clean_text = re.sub(r"\([A-Z\s]{4,}\)", "", clean_text).strip()
+                    clean_text = re.sub(r"[*_]+", "", clean_text).strip()
+
+                if not clean_text:
+                    continue
+
+                out_p = str(tts_dir / f"scene_{scene_idx:03d}" / f"s_{s_idx:03d}.wav")
+                synth_path = self.tts_manager.synthesize(
+                    text=clean_text or sentence,
+                    voice_id=eff_voice,
+                    speed=eff_speed,
+                    pitch=eff_pitch,
+                    output_path=out_p,
+                )
+                dur = self.tts_manager.get_audio_duration(synth_path) if synth_path else self.tts_manager.estimate_duration(clean_text, eff_speed)
+
+                if synth_path and acoustic_mastering and hasattr(self.tts_manager, "apply_acoustic_mastering"):
+                    self.tts_manager.apply_acoustic_mastering(synth_path, synth_path)
+
+                entries.append({"text": clean_text or sentence, "path": synth_path, "duration": dur})
 
             scene_dur = 0.0
             for entry in entries:
@@ -523,11 +646,14 @@ class VideoPipeline:
                 global_time += dur
                 all_sentence_audio.append(entry)
 
-            # Small breathing pause between scenes
+            # Small breathing pause between scenes (0ms drift calculation)
             if scene_dur > 0:
-                scene["duration"] = round(max(scene_dur + 0.25, 1.5), 3)
-                scene["_scene_start_time"] = max(0.0, global_time - scene_dur)
-                global_time += 0.25
+                sc_dur = round(max(scene_dur + 0.22, 1.2), 3)
+                scene["duration"] = sc_dur
+                scene["_silence_gap"] = round(sc_dur - scene_dur, 3)
+                scene["audio_parts"] = [e["path"] for e in entries if e.get("path")]
+                scene["_scene_start_time"] = round(global_time - scene_dur, 3)
+                global_time = round(scene["_scene_start_time"] + sc_dur, 3)
 
             report_fn((scene_idx + 1) / total_scenes)
 
@@ -547,42 +673,44 @@ class VideoPipeline:
         total_duration: float,
         audio_dir: Path,
         style_id: str = "s1_rsa_whiteboard",
+        timeline_manager: Optional[CentralTimelineManager] = None,
     ) -> Optional[str]:
         audio_dir.mkdir(parents=True, exist_ok=True)
 
-        # 1. Build continuous voice track (with 0.25s silence gaps matching scenes)
-        voice_track_parts: list[str] = []
-        silence_gap = str(audio_dir / "gap_250ms.wav")
-        self._audio_mixer.add_silence(0.25, silence_gap)
+        # 1. Build continuous voice track (with 0ms drift synchronized to visual timeline)
+        voice_concat = str(audio_dir / "voice_concat.wav")
+        if timeline_manager is not None:
+            timeline_manager.build_synchronized_audio_track(voice_concat, self._audio_mixer, audio_dir)
+        else:
+            voice_track_parts: list[str] = []
+            silence_cache: dict[float, str] = {}
+            for scene in scenes:
+                p = scene.get("_audio_path") or scene.get("audio_path")
+                if p and os.path.exists(p):
+                    voice_track_parts.append(p)
+                elif scene.get("audio_parts"):
+                    for ap in scene["audio_parts"]:
+                        if ap and os.path.exists(ap):
+                            voice_track_parts.append(ap)
+                gap = float(scene.get("_silence_gap", 0.22))
+                if gap > 0.01:
+                    if gap not in silence_cache:
+                        sg = str(audio_dir / f"gap_{int(gap * 1000)}ms.wav")
+                        self._audio_mixer.add_silence(gap, sg)
+                        silence_cache[gap] = sg
+                    voice_track_parts.append(silence_cache[gap])
 
-        # Group sentence files per scene so gaps match _synthesise_narration
-        cur_idx = 0
-        for scene in scenes:
-            narration = str(scene.get("narration", "")).strip()
-            if not narration:
-                continue
-            sents = self._caption_generator.split_into_sentences(narration) or [narration]
-            for _ in sents:
-                if cur_idx < len(sentence_audio):
-                    p = sentence_audio[cur_idx].get("path")
-                    if p and os.path.exists(p):
-                        voice_track_parts.append(p)
-                    cur_idx += 1
-            if os.path.exists(silence_gap):
-                voice_track_parts.append(silence_gap)
+            if voice_track_parts:
+                if len(voice_track_parts) == 1:
+                    shutil.copy2(voice_track_parts[0], voice_concat)
+                else:
+                    self._audio_mixer.concatenate_audio(voice_track_parts, voice_concat)
 
-        if not voice_track_parts:
+        if not os.path.exists(voice_concat) or os.path.getsize(voice_concat) == 0:
             # Generate silent master audio if TTS failed completely
             silent_out = str(audio_dir / "silent_master.wav")
             self._audio_mixer.add_silence(total_duration, silent_out)
             return silent_out if os.path.exists(silent_out) else None
-
-        voice_concat = str(audio_dir / "voice_concat.wav")
-        if len(voice_track_parts) == 1:
-            shutil.copy2(voice_track_parts[0], voice_concat)
-        else:
-            if not self._audio_mixer.concatenate_audio(voice_track_parts, voice_concat):
-                shutil.copy2(voice_track_parts[0], voice_concat)
 
         # 2. Prepare background music (custom MP3/WAV or locally synthesized)
         music_wav: Optional[str] = None

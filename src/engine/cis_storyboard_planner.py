@@ -60,6 +60,31 @@ CHOREOGRAPHY_TYPES = [
     "mind_storm_calm",
     "idea_spark_build",
     "two_path_fork",
+    "lighthouse_fog_beam",
+    "dopamine_spike_chart",
+    "split_mirror_ideal",
+    "pedestal_bust_trap",
+    "protective_couple_shield",
+    "notification_fishhook",
+    "crypto_market_rally",
+    "terminal_code_deploy",
+    "dumbbell_gym_lift",
+    "atom_quantum_orbit",
+    "stoic_pillar_stand",
+    "compound_interest_snowball",
+    "focus_pomodoro_timer",
+    "neural_net_synapse",
+    "iceberg_hidden_depth",
+    "hamster_wheel_break",
+    "chess_checkmate_move",
+    "battery_supercharge",
+    "rocket_launchpad_stage",
+    "scales_of_justice",
+    "puzzle_assembly",
+    "radar_scanner_sweep",
+    "dna_evolution_spiral",
+    "eisenhower_grid_sort",
+    "dynamic_synthesizer",
     "cta_celebration",
 ]
 
@@ -128,6 +153,15 @@ STYLE_THEMES: dict[str, dict[str, Any]] = {
 ACCENT_COLORS = ["#E63946", "#1D70B8", "#D97706", "#2A9D8F"]
 
 PROFILE_PREFERRED_STYLES: dict[str, list[str]] = {
+    "tech_software": ["B3", "B1", "B2"],
+    "fitness_discipline": ["B3", "B1", "B2"],
+    "finance_crypto": ["B3", "B1", "B2"],
+    "space_science": ["B3", "B1", "B2"],
+    "nature_adventure": ["B2", "B1", "B3"],
+    "education_learning": ["B1", "B3", "B2"],
+    "history_epic": ["B2", "B3", "B1"],
+    "relationships_dating": ["B3", "B1", "B2"],
+    "stoic_wisdom": ["B3", "B2", "B1"],
     "psychology": ["B3", "B1", "B2"],
     "growth_discipline": ["B1", "B3", "B2"],
     "social_contrast": ["B2", "B1", "B3"],
@@ -230,51 +264,75 @@ def script_fingerprint_seed(script: str, topic: str = "") -> int:
 
 
 def classify_video_profile(script: str, topic: str = "") -> str:
-    """Classify the reel's narrative genre from its script and topic."""
+    """Classify the reel's narrative genre from its script and topic with multi-domain intelligence."""
     text = f"{topic} {script}".lower()
-    scores = {
-        "psychology": 0,
-        "growth_discipline": 0,
-        "social_contrast": 0,
-        "story_wisdom": 0,
-    }
+    words = set(re.findall(r"[a-z']+", text))
 
-    kw_map = {
+    genre_rules = {
+        "tech_software": (
+            ("code", "coding", "software", "tech", "technology", "developer", "programmer", "server", "algorithm", "digital", "data", "bot", "python", "ai", "deploy", "terminal", "stack", "bug"),
+            ("software engineer", "lines of code", "write code", "cloud server")
+        ),
+        "fitness_discipline": (
+            ("gym", "workout", "exercise", "strength", "weights", "dumbbells", "barbell", "sweat", "lift", "lifting", "fitness", "muscle", "train", "body"),
+            ("working out", "lift weights", "hit the gym", "physical fitness")
+        ),
+        "finance_crypto": (
+            ("money", "finance", "wealth", "trading", "stock", "stocks", "crypto", "bitcoin", "dollar", "invest", "investing", "profit", "cash", "millionaire", "roi", "candlestick"),
+            ("stock market", "compound interest", "passive income", "make money")
+        ),
+        "space_science": (
+            ("space", "cosmos", "galaxy", "planet", "planets", "universe", "rocket", "astronaut", "orbit", "quantum", "physics", "atom", "stars", "gravity", "alien"),
+            ("deep space", "outer space", "night sky", "solar system")
+        ),
+        "nature_adventure": (
+            ("nature", "forest", "tree", "trees", "mountain", "mountains", "river", "hike", "hiking", "woods", "wild", "animal", "ocean", "sea", "desert", "explore"),
+            ("deep forest", "mountain range", "outdoor adventure")
+        ),
+        "education_learning": (
+            ("school", "class", "classroom", "student", "teacher", "lecture", "math", "exam", "lesson", "study", "studying", "book", "read", "reading", "learn", "skill"),
+            ("learn a skill", "reading books", "study habits")
+        ),
+        "history_epic": (
+            ("castle", "fortress", "king", "queen", "kingdom", "empire", "medieval", "battle", "war", "throne", "knights", "ancient", "emperor"),
+            ("ancient history", "stone castle", "throne room")
+        ),
+        "relationships_dating": (
+            ("text", "texting", "message", "reply", "replies", "call", "dating", "mixed", "ghost", "crush", "love", "partner", "attention", "special", "distant"),
+            ("mixed signals", "texting you", "stopped replying", "calls disappear")
+        ),
+        "stoic_wisdom": (
+            ("stoic", "calm", "peace", "boundary", "boundaries", "detach", "detachment", "patience", "silence", "quiet", "breathe", "unbothered", "inner peace"),
+            ("protect your peace", "set a boundary", "walk away", "inner calm")
+        ),
         "psychology": (
-            "brain", "mind", "narcissist", "embarrass", "awkward", "overthink",
-            "guilt", "manipulat", "ignore", "silent", "notice", "behavior",
-            "feeling", "emotion", "memory", "text you", "favor", "favour",
-            "need something", "secret", "anxiety", "phone", "scroll", "dopamine",
+            ("brain", "mind", "narcissist", "embarrass", "awkward", "overthink", "overthinking", "guilt", "manipulat", "ignore", "behavior", "feeling", "emotion", "ego", "shadow"),
+            ("human psychology", "human behavior", "psychological trick", "in your mind")
         ),
         "growth_discipline": (
-            "discipline", "habit", "morning", "compound", "brick", "focus",
-            "consistency", "routine", "productiv", "skill", "money", "invest",
-            "daily", "pages", "progress", "success", "work", "minute", "effort",
-            "climb", "build", "goal", "launch",
+            ("discipline", "habit", "habits", "routine", "compound", "brick", "focus", "consistency", "daily", "progress", "success", "work", "climb", "build", "goal"),
+            ("daily habit", "compound effect", "build discipline")
         ),
         "social_contrast": (
-            "society", "trap", "double standard", "cruel", "festival", "truth",
-            "reality", "versus", "vs", "myth", "excuse", "social media",
-            "crowd", "illusion", "most people", "fake", "comparison", "stranger",
-            "mistake", "judge",
-        ),
-        "story_wisdom": (
-            "calm", "peace", "boundary", "boundaries", "journey", "lesson",
-            "protect", "strength", "patience", "heal", "clarity", "quiet",
-            "respect", "choose", "walk away", "gentle", "mirror", "reflection",
+            ("society", "trap", "double standard", "cruel", "truth", "reality", "versus", "vs", "myth", "crowd", "illusion", "fake", "comparison", "judge"),
+            ("most people", "double standard", "harsh reality")
         ),
     }
 
-    for prof, kws in kw_map.items():
-        for kw in kws:
-            if kw in text:
-                scores[prof] += 2 if kw in (topic or "").lower() else 1
+    scores = {k: 0 for k in genre_rules}
+    for prof, (kw_list, phrases) in genre_rules.items():
+        for phrase in phrases:
+            if phrase in text:
+                scores[prof] += 5
+        for kw in kw_list:
+            if kw in words:
+                scores[prof] += 3 if kw in (topic or "").lower() else 2
 
-    best_prof = max(scores.items(), key=lambda item: item[1])
-    if best_prof[1] > 0:
-        return best_prof[0]
+    best_prof, best_score = max(scores.items(), key=lambda item: item[1])
+    if best_score > 0:
+        return best_prof
 
-    profiles = ["psychology", "growth_discipline", "social_contrast", "story_wisdom"]
+    profiles = list(genre_rules.keys())
     return profiles[script_fingerprint_seed(script, topic) % len(profiles)]
 
 
@@ -519,6 +577,25 @@ def _pick_layout_mode(
         "mind_storm_calm": ["comic_beats", "clean_stage", "floating_callout"],
         "idea_spark_build": ["floating_callout", "big_typo_banner", "clean_stage"],
         "two_path_fork": ["split_screen", "clean_stage", "comic_beats"],
+        "terminal_code_deploy": ["clean_stage", "comic_beats", "floating_callout"],
+        "dumbbell_gym_lift": ["clean_stage", "big_typo_banner", "floating_callout"],
+        "crypto_market_rally": ["floating_callout", "split_screen", "clean_stage"],
+        "atom_quantum_orbit": ["clean_stage", "editorial_spread", "floating_callout"],
+        "stoic_pillar_stand": ["clean_stage", "editorial_spread", "comic_beats"],
+        "compound_interest_snowball": ["clean_stage", "floating_callout", "big_typo_banner"],
+        "focus_pomodoro_timer": ["clean_stage", "floating_callout", "comic_beats"],
+        "neural_net_synapse": ["clean_stage", "floating_callout", "editorial_spread"],
+        "iceberg_hidden_depth": ["clean_stage", "split_screen", "editorial_spread"],
+        "hamster_wheel_break": ["comic_beats", "clean_stage", "floating_callout"],
+        "chess_checkmate_move": ["clean_stage", "comic_beats", "editorial_spread"],
+        "battery_supercharge": ["clean_stage", "floating_callout", "big_typo_banner"],
+        "rocket_launchpad_stage": ["big_typo_banner", "clean_stage", "floating_callout"],
+        "scales_of_justice": ["split_screen", "clean_stage", "floating_callout"],
+        "puzzle_assembly": ["clean_stage", "comic_beats", "floating_callout"],
+        "radar_scanner_sweep": ["clean_stage", "floating_callout", "editorial_spread"],
+        "dna_evolution_spiral": ["clean_stage", "editorial_spread", "floating_callout"],
+        "eisenhower_grid_sort": ["split_screen", "clean_stage", "floating_callout"],
+        "dynamic_synthesizer": ["clean_stage", "floating_callout", "comic_beats", "editorial_spread"],
         "cta_celebration": ["clean_stage"],
     }
     candidates = list(preferred_by_choreo.get(choreo, LAYOUT_MODES))
@@ -540,22 +617,45 @@ def _extract_prop_kind(text: str) -> str:
     low = (text or "").lower()
     words = set(re.findall(r"[a-z']+", low))
     prop_rules = [
-        ("phone", ("phone", "smartphone", "screen", "scroll", "scrolling", "notification", "app", "text")),
+        ("phone", ("phone", "smartphone", "screen", "scroll", "scrolling", "notification", "app", "text", "replies", "call")),
         ("heart", ("love", "heart", "care", "kindness", "feel", "feeling", "empathy", "emotion", "loyal")),
-        ("coin", ("money", "wealth", "rich", "poor", "cost", "worth", "invest", "price", "value", "profit", "favor")),
-        ("book", ("book", "books", "read", "reading", "learn", "study", "page", "pages", "knowledge", "wisdom")),
+        ("coin", ("money", "wealth", "rich", "poor", "cost", "worth", "invest", "price", "value", "profit", "favor", "dollar", "crypto")),
+        ("book", ("book", "books", "read", "reading", "learn", "study", "page", "pages", "knowledge", "wisdom", "school")),
         ("shield", ("boundary", "boundaries", "protect", "safe", "guard", "respect", "defense", "shield")),
-        ("clock", ("time", "clock", "hour", "hours", "minute", "minutes", "late", "wait", "deadline", "morning")),
+        ("clock", ("time", "clock", "hour", "hours", "minute", "minutes", "late", "wait", "deadline", "morning", "timer")),
         ("lightning", ("anger", "panic", "stress", "anxiety", "overwhelm", "fear", "shock", "storm", "burnout")),
         ("key", ("secret", "truth", "unlock", "answer", "solution", "clarity", "aware", "awareness")),
-        ("mask", ("fake", "pretend", "illusion", "lie", "lies", "manipulat", "hide", "double")),
-        ("crown", ("win", "success", "goal", "achieve", "confidence", "king", "leader", "power", "dream")),
-        ("brain", ("brain", "mind", "think", "thinking", "overthink", "memory", "focus", "habit")),
+        ("mask", ("fake", "pretend", "illusion", "lie", "lies", "manipulat", "hide", "double", "ego")),
+        ("crown", ("win", "success", "goal", "achieve", "confidence", "king", "leader", "power", "dream", "trophy")),
+        ("brain", ("brain", "mind", "think", "thinking", "overthink", "memory", "focus", "habit", "neural", "synapse")),
         ("sun", ("peace", "calm", "hope", "bright", "light", "heal", "free", "freedom")),
+        ("code", ("code", "coding", "software", "tech", "developer", "server", "algorithm", "python", "deploy", "terminal")),
+        ("dumbbell", ("gym", "workout", "lift", "lifting", "weights", "dumbbells", "barbell", "exercise", "muscle", "fitness")),
+        ("rocket", ("rocket", "launch", "space", "cosmos", "fly", "soar", "blast", "mission")),
+        ("tree", ("tree", "trees", "forest", "nature", "mountain", "plant", "woods", "wild")),
+        ("car", ("car", "cars", "drive", "driving", "road", "highway", "vehicle")),
+        ("laptop", ("laptop", "computer", "pc", "digital", "screen")),
+        ("coffee", ("coffee", "cup", "tea", "cafe", "drink")),
+        ("cat", ("cat", "kitten", "kitty")),
+        ("dog", ("dog", "puppy", "hound")),
+        ("trophy", ("trophy", "champion", "award", "medal")),
+        ("chess", ("chess", "checkmate", "strategy", "tactics", "pawn")),
+        ("battery", ("battery", "energy", "charge", "drain", "exhausted", "power")),
+        ("iceberg", ("iceberg", "depth", "surface", "hidden", "below")),
     ]
     for kind, kws in prop_rules:
         if any(k in words or k in low for k in kws):
             return kind
+
+    # Check the 1,000+ procedural object engine catalog
+    try:
+        from engine.procedural_object_engine import ProceduralObjectEngine
+        for w in words:
+            if w in ProceduralObjectEngine.ALIASES:
+                return ProceduralObjectEngine.ALIASES[w].lower()
+    except Exception:
+        pass
+
     return "spark"
 
 
@@ -565,6 +665,24 @@ def _score_choreographies(text: str) -> list[tuple[int, str]]:
     words = set(re.findall(r"[a-z']+", lower))
 
     choreo_phrases: dict[str, tuple[str, ...]] = {
+        "terminal_code_deploy": ("software engineer", "lines of code", "write code", "cloud server", "deploy code", "run code"),
+        "dumbbell_gym_lift": ("working out", "lift weights", "hit the gym", "physical fitness", "heavy weights"),
+        "crypto_market_rally": ("stock market", "crypto market", "market rally", "trading stocks", "candlestick chart"),
+        "atom_quantum_orbit": ("quantum physics", "atomic level", "orbiting particles", "deep science"),
+        "stoic_pillar_stand": ("unshakeable peace", "inner pillar", "stand your ground", "stoic calm"),
+        "compound_interest_snowball": ("compound interest", "snowball effect", "exponential growth", "wealth building"),
+        "focus_pomodoro_timer": ("deep work", "pomodoro timer", "intense focus", "zero distraction"),
+        "neural_net_synapse": ("neural network", "brain synapses", "mental connections", "artificial intelligence"),
+        "iceberg_hidden_depth": ("tip of the iceberg", "hidden underneath", "beneath the surface", "unseen depth"),
+        "hamster_wheel_break": ("rat race", "hamster wheel", "endless cycle", "break the loop"),
+        "chess_checkmate_move": ("three steps ahead", "checkmate move", "strategic move", "play the long game"),
+        "battery_supercharge": ("recharge your battery", "low battery", "drained of energy", "full power"),
+        "rocket_launchpad_stage": ("ready for launch", "rocket launch", "lift off", "reach the stars"),
+        "scales_of_justice": ("scales of justice", "fair and unfair", "moral balance", "court of law"),
+        "puzzle_assembly": ("missing puzzle piece", "piece together", "solve the puzzle"),
+        "radar_scanner_sweep": ("radar scan", "under the radar", "detect the signal"),
+        "dna_evolution_spiral": ("genetic code", "human evolution", "dna spiral"),
+        "eisenhower_grid_sort": ("urgent vs important", "priority matrix", "four quadrants"),
         "give_and_withdraw": (
             "need something", "remember you", "only text", "only call", "one sided",
             "walk away", "turn away", "use you", "used you", "when they need", "give too much",
@@ -588,12 +706,30 @@ def _score_choreographies(text: str) -> list[tuple[int, str]]:
         "idea_spark_build": (
             "small steps", "learn every", "read every", "new skill", "bright idea",
         ),
-        "phone_trap": ("social media", "pick up your phone", "staring at your screen"),
+        "phone_trap": ("social media", "pick up your phone", "staring at your screen", "texting you", "stopped replying"),
         "spotlight_shift": ("double standard", "most people", "stop caring what"),
     }
 
     choreo_keywords: dict[str, tuple[str, ...]] = {
-        "give_and_withdraw": ("favor", "favour", "favors", "help", "give", "take", "takes", "leave", "leaves", "ghost", "abandon", "forget", "remember", "need", "selfish", "betray"),
+        "terminal_code_deploy": ("code", "coding", "software", "terminal", "deploy", "developer", "server", "algorithm", "python", "bug", "program", "stack", "tech"),
+        "dumbbell_gym_lift": ("gym", "workout", "lift", "lifting", "weights", "dumbbells", "barbell", "exercise", "muscle", "fitness", "body", "train"),
+        "crypto_market_rally": ("crypto", "bitcoin", "trading", "stock", "stocks", "market", "candlestick", "rally", "profit", "bull", "bear", "invest", "wealth"),
+        "atom_quantum_orbit": ("atom", "quantum", "orbit", "particle", "physics", "science", "formula", "nucleus", "energy", "star", "stars", "universe", "cosmos", "galaxy", "planet", "planets", "deep space", "space"),
+        "stoic_pillar_stand": ("stoic", "pillar", "stand", "unshakeable", "firm", "calm", "storm", "resilient", "strength", "endure"),
+        "compound_interest_snowball": ("compound", "compounds", "snowball", "interest", "wealth", "invest", "investing", "multiplier", "accumulate"),
+        "focus_pomodoro_timer": ("pomodoro", "timer", "distraction", "concentrate", "concentration", "deep work", "study clock"),
+        "neural_net_synapse": ("neural", "synapse", "brain", "network", "nodes", "intelligence", "ai", "neurons", "signals"),
+        "iceberg_hidden_depth": ("iceberg", "surface", "depth", "depths", "hidden", "below", "underwater", "unseen", "tip"),
+        "hamster_wheel_break": ("hamster", "wheel", "routine", "trap", "cycle", "loop", "endless", "rat"),
+        "chess_checkmate_move": ("chess", "checkmate", "strategy", "move", "tactics", "pawn", "king", "mastermind"),
+        "battery_supercharge": ("battery", "energy", "charge", "drain", "drained", "exhausted", "power", "recharge", "burnout"),
+        "rocket_launchpad_stage": ("launch", "launchpad", "stage", "liftoff", "soar", "blast", "ignition", "mission", "reach", "space"),
+        "scales_of_justice": ("justice", "fair", "unfair", "law", "court", "judge", "guilty", "innocent", "verdict", "moral"),
+        "puzzle_assembly": ("puzzle", "piece", "pieces", "assembly", "fit", "missing", "complete", "connect", "solve"),
+        "radar_scanner_sweep": ("radar", "scanner", "scan", "detect", "detection", "sonar", "sweep", "target", "signal"),
+        "dna_evolution_spiral": ("dna", "evolution", "genes", "genetic", "spiral", "biology", "evolve", "mutation", "species"),
+        "eisenhower_grid_sort": ("urgent", "important", "priority", "priorities", "matrix", "grid", "delegate", "eliminate", "schedule"),
+        "give_and_withdraw": ("favor", "favour", "favors", "one-sided", "ghosted", "abandon", "selfish", "betrayal", "take-advantage", "unreciprocated"),
         "boundary_shield": ("boundary", "boundaries", "protect", "respect", "guard", "toxic", "shield", "drama", "refuse", "defend", "limit"),
         "tether_break": ("attach", "attached", "attachment", "illusion", "chain", "chains", "escape", "quit", "release", "free", "freedom", "drop"),
         "mind_storm_calm": ("anxiety", "anxious", "stress", "stressed", "panic", "overwhelm", "overwhelmed", "storm", "breathe", "calm", "peace", "silence", "quiet", "heal", "healing"),
@@ -603,10 +739,10 @@ def _score_choreographies(text: str) -> list[tuple[int, str]]:
         "staircase_climb": ("brick", "bricks", "compound", "compounds", "climb", "stair", "stairs", "level", "habit", "habits", "daily", "build", "progress", "stack", "momentum"),
         "scale_tipping": ("balance", "scale", "weigh", "choice", "choices", "tradeoff", "worth", "cost", "heavy", "either", "value"),
         "domino_ripple": ("domino", "dominoes", "trigger", "triggers", "chain", "ripple", "effect", "spark", "cascade"),
-        "mirror_truth": ("mirror", "reflect", "reflection", "yourself", "inside", "identity", "honest", "face", "doubt", "self"),
+        "mirror_truth": ("mirror", "mirrors", "reflect", "reflection", "reflecting", "honest-look", "self-image"),
         "hourglass_sprint": ("time", "clock", "alarm", "late", "morning", "minute", "minutes", "hour", "wait", "hurry", "rush", "run", "running", "deadline"),
-        "bridge_cross": ("gap", "gaps", "bridge", "across", "obstacle", "wall", "stuck", "fear", "leap", "breakthrough", "disappear", "disappears"),
-        "question_burst": ("why", "overthink", "overthinking", "brain", "mind", "confused", "wonder", "question", "secret", "notice"),
+        "bridge_cross": ("gap", "gaps", "bridge", "across", "obstacle", "wall", "stuck", "fear", "leap", "breakthrough", "disappear", "disappears", "forest", "mountain", "mountains", "river", "nature", "tree", "trees", "woods", "hiking"),
+        "question_burst": ("overthink", "overthinking", "confused", "curiosity", "puzzle", "mystery", "unsolved"),
         "spotlight_shift": ("spotlight", "attention", "judge", "judging", "stranger", "double", "blame", "credit", "focus", "mistake"),
         "magnet_orbit": ("attract", "pull", "pulls", "energy", "magnet", "relationship", "trust", "loyalty"),
         "crowd_filter": ("crowd", "everyone", "others", "friends", "society", "room", "noise"),
@@ -619,14 +755,23 @@ def _score_choreographies(text: str) -> list[tuple[int, str]]:
         score = 0
         for ph in choreo_phrases.get(c_name, ()):
             if ph in lower:
-                score += 4
+                score += 5
         for kw in choreo_keywords.get(c_name, ()):
             if kw in words:
-                score += 2
+                score += 3
         if c_name == "question_burst" and "?" in text:
             score += 2
         if score > 0:
             hit_scores.append((score, c_name))
+
+    # Give dynamic_synthesizer priority when a rich semantic prop from the 1,025+ catalog is present
+    try:
+        from engine.procedural_object_engine import ProceduralObjectEngine
+        has_prop = any(w in ProceduralObjectEngine.ALIASES for w in words)
+        if has_prop:
+            hit_scores.append((4, "dynamic_synthesizer"))
+    except Exception:
+        pass
 
     hit_scores.sort(key=lambda item: (-item[0], item[1]))
     return hit_scores
@@ -647,21 +792,70 @@ def _pick_choreography(
     scored = [c for _, c in hit_scores]
 
     profile_pools = {
+        "tech_software": [
+            "terminal_code_deploy", "neural_net_synapse", "radar_scanner_sweep",
+            "atom_quantum_orbit", "idea_spark_build", "puzzle_assembly",
+            "rocket_breakthrough", "battery_supercharge", "dynamic_synthesizer",
+        ],
+        "fitness_discipline": [
+            "dumbbell_gym_lift", "battery_supercharge", "staircase_climb",
+            "stoic_pillar_stand", "two_path_fork", "focus_pomodoro_timer",
+            "hamster_wheel_break", "rocket_breakthrough", "dynamic_synthesizer",
+        ],
+        "finance_crypto": [
+            "crypto_market_rally", "compound_interest_snowball", "scale_tipping",
+            "iceberg_hidden_depth", "chess_checkmate_move", "rocket_launchpad_stage",
+            "split_cards_slide", "two_path_fork", "dynamic_synthesizer",
+        ],
+        "space_science": [
+            "atom_quantum_orbit", "rocket_launchpad_stage", "rocket_breakthrough",
+            "radar_scanner_sweep", "dna_evolution_spiral", "puzzle_assembly",
+            "hourglass_sprint", "neural_net_synapse", "dynamic_synthesizer",
+        ],
+        "nature_adventure": [
+            "bridge_cross", "two_path_fork", "rocket_breakthrough",
+            "dna_evolution_spiral", "stoic_pillar_stand", "tether_break",
+            "mind_storm_calm", "hourglass_sprint", "dynamic_synthesizer",
+        ],
+        "education_learning": [
+            "idea_spark_build", "staircase_climb", "puzzle_assembly",
+            "focus_pomodoro_timer", "eisenhower_grid_sort", "chess_checkmate_move",
+            "atom_quantum_orbit", "domino_ripple", "dynamic_synthesizer",
+        ],
+        "history_epic": [
+            "scales_of_justice", "stoic_pillar_stand", "chess_checkmate_move",
+            "iceberg_hidden_depth", "pedestal_bust_trap", "two_path_fork",
+            "rocket_breakthrough", "crowd_filter", "dynamic_synthesizer",
+        ],
+        "relationships_dating": [
+            "phone_trap", "give_and_withdraw", "protective_couple_shield",
+            "notification_fishhook", "split_mirror_ideal", "boundary_shield",
+            "tether_break", "mirror_truth", "dynamic_synthesizer",
+        ],
+        "stoic_wisdom": [
+            "stoic_pillar_stand", "mind_storm_calm", "boundary_shield",
+            "tether_break", "mirror_truth", "lighthouse_fog_beam",
+            "iceberg_hidden_depth", "two_path_fork", "dynamic_synthesizer",
+        ],
         "psychology": [
             "give_and_withdraw", "mirror_truth", "question_burst", "boundary_shield",
             "mind_storm_calm", "tether_break", "phone_trap", "spotlight_shift",
+            "neural_net_synapse", "dopamine_spike_chart", "dynamic_synthesizer",
         ],
         "growth_discipline": [
             "staircase_climb", "two_path_fork", "idea_spark_build", "hourglass_sprint",
             "domino_ripple", "bridge_cross", "rocket_breakthrough", "scale_tipping",
+            "focus_pomodoro_timer", "compound_interest_snowball", "dynamic_synthesizer",
         ],
         "social_contrast": [
             "give_and_withdraw", "split_cards_slide", "spotlight_shift", "crowd_filter",
             "boundary_shield", "phone_trap", "scale_tipping", "mirror_truth",
+            "scales_of_justice", "dynamic_synthesizer",
         ],
         "story_wisdom": [
             "tether_break", "mind_storm_calm", "bridge_cross", "mirror_truth",
             "idea_spark_build", "two_path_fork", "magnet_orbit", "rocket_breakthrough",
+            "stoic_pillar_stand", "dynamic_synthesizer",
         ],
     }
 
@@ -881,6 +1075,47 @@ def _build_cta_scene(
     }
 
 
+def _expand_long_dialogue_turns(turns: list[dict], max_words: int = 34, min_words_per_beat: int = 8) -> list[dict]:
+    """
+    Splits long multi-sentence dialogue monologues (> max_words) into dynamic consecutive visual beats
+    for the same speaker so scenes change naturally every 6-9 seconds without flashing micro-cuts.
+    Preserves short reactions and introductory phrases with their parent sentences.
+    """
+    expanded: list[dict] = []
+    for turn in turns:
+        text = str(turn.get("text", "")).strip()
+        words = text.split()
+        if len(words) <= max_words:
+            expanded.append(turn)
+            continue
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        sentences = [s.strip() for s in sentences if s.strip()]
+        if len(sentences) <= 1:
+            expanded.append(turn)
+            continue
+        cur_sentences: list[str] = []
+        cur_count = 0
+        for s in sentences:
+            swc = len(s.split())
+            if cur_sentences and cur_count >= min_words_per_beat and (cur_count + swc > max_words):
+                expanded.append({**turn, "text": " ".join(cur_sentences)})
+                cur_sentences = [s]
+                cur_count = swc
+            else:
+                cur_sentences.append(s)
+                cur_count += swc
+        if cur_sentences:
+            if expanded and cur_count < min_words_per_beat:
+                prev = expanded[-1]
+                if prev.get("speaker") == turn.get("speaker"):
+                    expanded[-1] = {**prev, "text": f"{prev['text']} {' '.join(cur_sentences)}"}
+                else:
+                    expanded.append({**turn, "text": " ".join(cur_sentences)})
+            else:
+                expanded.append({**turn, "text": " ".join(cur_sentences)})
+    return expanded
+
+
 class CISStoryboardPlanner:
     """Converts any topic + script into a non-repetitive, script-unique storyboard."""
 
@@ -934,18 +1169,42 @@ class CISStoryboardPlanner:
         )
 
         scenes: list[dict] = []
-        if self._is_ollama_running():
-            try:
-                scenes = self._plan_with_llm(
+
+        # Check for structured story beats & multi-turn dialogue format
+        from engine.script_intelligence import ScriptIntelligenceEngine
+        story_beats = ScriptIntelligenceEngine.parse_script_to_story_beats(script)
+        dialogue_turns = [
+            {
+                "speaker": b.get("speaker", 1),
+                "speaker_name": b.get("speaker_name", "Alex"),
+                "text": b.get("narration", ""),
+            }
+            for b in story_beats
+        ] if story_beats else []
+
+        if len(dialogue_turns) >= 2:
+            dialogue_turns = _expand_long_dialogue_turns(dialogue_turns, max_words=34, min_words_per_beat=8)
+            logger.info(
+                "CISStoryboardPlanner: Detected %d structured story beats (expanded to %d visual beats); building dialogue storyboard.",
+                len(story_beats),
+                len(dialogue_turns),
+            )
+            scenes = self._plan_dialogue_storyboard(
+                dialogue_turns, topic, accent_color, chosen_style, profile, seed
+            )
+        else:
+            if self._is_ollama_running():
+                try:
+                    scenes = self._plan_with_llm(
+                        cleaned, topic, accent_color, scene_density, profile, chosen_style, seed
+                    )
+                except Exception as exc:
+                    logger.warning("CISStoryboardPlanner LLM path failed: %s; using dynamic rule-based", exc)
+
+            if not scenes or len(scenes) < 2:
+                scenes = self._plan_rule_based(
                     cleaned, topic, accent_color, scene_density, profile, chosen_style, seed
                 )
-            except Exception as exc:
-                logger.warning("CISStoryboardPlanner LLM path failed: %s; using dynamic rule-based", exc)
-
-        if not scenes or len(scenes) < 2:
-            scenes = self._plan_rule_based(
-                cleaned, topic, accent_color, scene_density, profile, chosen_style, seed
-            )
 
         if enable_cta:
             eff_vs = "B3" if chosen_style == "AUTO_MIX" else chosen_style
@@ -966,6 +1225,72 @@ class CISStoryboardPlanner:
                     prev_palette_key=prev_pal,
                 )
             )
+
+        return scenes
+
+    def _plan_dialogue_storyboard(
+        self,
+        dialogue_turns: list[dict],
+        topic: str,
+        accent_color: Optional[str],
+        visual_style: str,
+        profile: str,
+        seed: int,
+    ) -> list[dict]:
+        total_scenes = len(dialogue_turns)
+        scenes: list[dict] = []
+        prev_choreo = ""
+        prev_layout = ""
+        prev_motion = ""
+        prev_palette = ""
+        used_choreos: set[str] = set()
+        used_layouts: set[str] = set()
+        eff_vs = "B3" if visual_style == "AUTO_MIX" else visual_style
+
+        for i, turn in enumerate(dialogue_turns):
+            narration = turn.get("text", "").strip()
+            speaker = turn.get("speaker", 1)
+            speaker_name = turn.get("speaker_name", "Alex")
+
+            choreo, _ = _pick_choreography(
+                narration, i, total_scenes, profile, seed, prev_choreo, used_choreos
+            )
+            prev_choreo = choreo
+            used_choreos.add(choreo)
+
+            layout_mode = _pick_layout_mode(
+                choreo, i, total_scenes, profile, seed, prev_layout, used_layouts
+            )
+            prev_layout = layout_mode
+            used_layouts.add(layout_mode)
+
+            motion = _pick_motion_preset(choreo, profile, i, seed, prev_motion)
+            prev_motion = motion
+
+            accent = "" if (not accent_color and visual_style == "AUTO_MIX") else resolve_accent_color(
+                accent_color, i, profile=profile, visual_style=eff_vs, seed=seed
+            )
+
+            sc = _build_dynamic_scene_fields(
+                narration=narration,
+                topic=topic,
+                idx=i,
+                total_scenes=total_scenes,
+                choreo=choreo,
+                layout_mode=layout_mode,
+                accent=accent,
+                visual_style=visual_style,
+                profile=profile,
+                motion_preset=motion,
+                seed=seed,
+                prev_palette_key=prev_palette,
+            )
+            prev_palette = str(sc.get("palette_key", ""))
+            sc["speaker"] = speaker
+            sc["speaker_name"] = speaker_name
+            sc["speaker_badge"] = speaker_name.upper()
+            sc["narration"] = narration
+            scenes.append(sc)
 
         return scenes
 

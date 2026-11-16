@@ -155,6 +155,8 @@ class VoicePanel(QWidget):
     voice_changed = Signal(str)           # voice_id
     preview_requested = Signal(str, str)  # voice_id, preview_text
     auto_speed_changed = Signal(bool)     # auto_speed enabled
+    dialogue_mode_changed = Signal(bool)  # dialogue_mode enabled
+    speaker_names_changed = Signal(str, str)  # name1, name2
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -238,17 +240,44 @@ class VoicePanel(QWidget):
 
         # ---- Right: settings ----
         right_widget = QWidget()
-        right_widget.setMinimumWidth(240)
+        right_widget.setMinimumWidth(320)
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(12, 4, 4, 4)
-        right_layout.setSpacing(10)
+        right_layout.setContentsMargins(12, 4, 8, 4)
+        right_layout.setSpacing(8)
 
-        settings_lbl = QLabel("Audio Settings")
+        # Header: Mode Switcher (Solo vs Two-Voice Dialogue)
+        header_row = QHBoxLayout()
+        settings_lbl = QLabel("Voice Engine")
         settings_lbl.setObjectName("section")
         settings_lbl.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        right_layout.addWidget(settings_lbl)
+        header_row.addWidget(settings_lbl)
+        header_row.addStretch()
 
-        # Speed (with Auto Pacing option)
+        self._mode_solo_btn = QPushButton("👤 Solo Voice")
+        self._mode_solo_btn.setCheckable(True)
+        self._mode_solo_btn.setChecked(True)
+        self._mode_solo_btn.setStyleSheet("""
+            QPushButton { background: #1E293B; color: #94A3B8; border: 1px solid #334155; border-radius: 6px; padding: 4px 10px; font-weight: bold; }
+            QPushButton:checked { background: #0284C7; color: #FFFFFF; border-color: #38BDF8; }
+        """)
+        self._mode_dialogue_btn = QPushButton("👥 Two-Voice Dialogue")
+        self._mode_dialogue_btn.setCheckable(True)
+        self._mode_dialogue_btn.setStyleSheet("""
+            QPushButton { background: #1E293B; color: #94A3B8; border: 1px solid #334155; border-radius: 6px; padding: 4px 10px; font-weight: bold; }
+            QPushButton:checked { background: #8B5CF6; color: #FFFFFF; border-color: #C084FC; }
+        """)
+        self._mode_solo_btn.clicked.connect(lambda: self._set_dialogue_ui_active(False))
+        self._mode_dialogue_btn.clicked.connect(lambda: self._set_dialogue_ui_active(True))
+        header_row.addWidget(self._mode_solo_btn)
+        header_row.addWidget(self._mode_dialogue_btn)
+        right_layout.addLayout(header_row)
+
+        # --- Container 1: Solo Voice Settings ---
+        self._solo_container = QWidget()
+        solo_v = QVBoxLayout(self._solo_container)
+        solo_v.setContentsMargins(0, 0, 0, 0)
+        solo_v.setSpacing(8)
+
         speed_group = self._make_slider_group(
             "Speed", "speed", 5, 20, 10, lambda v: f"{v / 10:.1f}×"
         )
@@ -258,43 +287,121 @@ class VoicePanel(QWidget):
         self._auto_speed_chk.toggled.connect(self._on_auto_speed_toggled)
         speed_header = speed_group.layout().itemAt(0).layout()
         speed_header.insertWidget(1, self._auto_speed_chk)
-        right_layout.addWidget(speed_group)
+        self._speed_slider.valueChanged.connect(self._on_master_speed_changed)
+        solo_v.addWidget(speed_group)
 
-        # Pitch
-        right_layout.addWidget(self._make_slider_group(
+        solo_v.addWidget(self._make_slider_group(
             "Pitch", "pitch", -5, 5, 0, lambda v: f"{v:+d} st"
         ))
-
-        # Volume
-        right_layout.addWidget(self._make_slider_group(
+        solo_v.addWidget(self._make_slider_group(
             "Volume", "volume", 0, 100, 85, lambda v: f"{v}%"
         ))
 
-        # Preview text
-        preview_group = QGroupBox("Preview")
+        preview_group = QGroupBox("Solo Preview")
         preview_group.setStyleSheet(
-            "QGroupBox { border: 1px solid #0f3460; border-radius: 6px; margin-top: 10px; color: #4FC3F7; font-weight: bold; }"
+            "QGroupBox { border: 1px solid #0f3460; border-radius: 6px; margin-top: 6px; color: #4FC3F7; font-weight: bold; }"
             "QGroupBox::title { subcontrol-origin: margin; left: 10px; }"
         )
         pg_layout = QVBoxLayout(preview_group)
         self._preview_text = QLineEdit("The quick brown fox jumps over the lazy dog.")
         self._preview_text.setPlaceholderText("Enter preview text…")
         pg_layout.addWidget(self._preview_text)
-
-        self._preview_btn = QPushButton("▶  Preview Voice")
+        self._preview_btn = QPushButton("▶  Preview Selected Voice")
         self._preview_btn.clicked.connect(self._on_preview_clicked)
         pg_layout.addWidget(self._preview_btn)
-        right_layout.addWidget(preview_group)
+        solo_v.addWidget(preview_group)
 
-        # Selected voice info
         self._selected_info_lbl = QLabel("No voice selected")
         self._selected_info_lbl.setStyleSheet("color: #888; font-style: italic;")
         self._selected_info_lbl.setWordWrap(True)
-        right_layout.addWidget(self._selected_info_lbl)
+        solo_v.addWidget(self._selected_info_lbl)
+        right_layout.addWidget(self._solo_container)
+
+        # --- Container 2: Two-Voice Dialogue Settings ---
+        self._dialogue_container = QWidget()
+        self._dialogue_container.setVisible(False)
+        dial_v = QVBoxLayout(self._dialogue_container)
+        dial_v.setContentsMargins(0, 0, 0, 0)
+        dial_v.setSpacing(8)
+
+        # Speaker 1 Box
+        s1_box = QGroupBox("Speaker 1 (e.g. Question / Seeker)")
+        s1_box.setStyleSheet(
+            "QGroupBox { border: 1px solid #2563EB; border-radius: 8px; margin-top: 6px; color: #60A5FA; font-weight: bold; padding: 6px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 10px; }"
+        )
+        s1_layout = QVBoxLayout(s1_box)
+        s1_layout.setSpacing(4)
+        s1_name_row = QHBoxLayout()
+        s1_name_lbl = QLabel("Name:")
+        s1_name_lbl.setStyleSheet("color: #E2E8F0; font-weight: normal;")
+        self._s1_name_edit = QLineEdit("Alex")
+        self._s1_name_edit.setPlaceholderText("Character 1 name (e.g. Alex)")
+        self._s1_name_edit.textChanged.connect(self._emit_speaker_names)
+        s1_name_row.addWidget(s1_name_lbl)
+        s1_name_row.addWidget(self._s1_name_edit, stretch=1)
+        s1_layout.addLayout(s1_name_row)
+
+        self._s1_voice_combo = QComboBox()
+        s1_layout.addWidget(self._s1_voice_combo)
+
+        s1_ctrl_row = QHBoxLayout()
+        s1_ctrl_row.addWidget(self._make_slider_group("Speed", "s1_speed", 5, 20, 10, lambda v: f"{v / 10:.1f}×"))
+        s1_ctrl_row.addWidget(self._make_slider_group("Pitch", "s1_pitch", -5, 5, 0, lambda v: f"{v:+d} st"))
+        s1_layout.addLayout(s1_ctrl_row)
+
+        self._s1_prev_btn = QPushButton("▶ Preview Speaker 1")
+        self._s1_prev_btn.clicked.connect(self._preview_speaker1)
+        s1_layout.addWidget(self._s1_prev_btn)
+        dial_v.addWidget(s1_box)
+
+        # Speaker 2 Box
+        s2_box = QGroupBox("Speaker 2 (e.g. Guide / Emotional Clarity)")
+        s2_box.setStyleSheet(
+            "QGroupBox { border: 1px solid #7C3AED; border-radius: 8px; margin-top: 6px; color: #C084FC; font-weight: bold; padding: 6px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 10px; }"
+        )
+        s2_layout = QVBoxLayout(s2_box)
+        s2_layout.setSpacing(4)
+        s2_name_row = QHBoxLayout()
+        s2_name_lbl = QLabel("Name:")
+        s2_name_lbl.setStyleSheet("color: #E2E8F0; font-weight: normal;")
+        self._s2_name_edit = QLineEdit("Maya")
+        self._s2_name_edit.setPlaceholderText("Character 2 name (e.g. Maya)")
+        self._s2_name_edit.textChanged.connect(self._emit_speaker_names)
+        s2_name_row.addWidget(s2_name_lbl)
+        s2_name_row.addWidget(self._s2_name_edit, stretch=1)
+        s2_layout.addLayout(s2_name_row)
+
+        self._s2_voice_combo = QComboBox()
+        s2_layout.addWidget(self._s2_voice_combo)
+
+        s2_ctrl_row = QHBoxLayout()
+        s2_ctrl_row.addWidget(self._make_slider_group("Speed", "s2_speed", 5, 20, 10, lambda v: f"{v / 10:.1f}×"))
+        s2_ctrl_row.addWidget(self._make_slider_group("Pitch", "s2_pitch", -5, 5, 0, lambda v: f"{v:+d} st"))
+        s2_layout.addLayout(s2_ctrl_row)
+
+        self._s2_prev_btn = QPushButton("▶ Preview Speaker 2")
+        self._s2_prev_btn.clicked.connect(self._preview_speaker2)
+        s2_layout.addWidget(self._s2_prev_btn)
+        dial_v.addWidget(s2_box)
+
+        # Dialogue Options
+        self._address_by_name_chk = QCheckBox("Characters address each other by name in script")
+        self._address_by_name_chk.setChecked(True)
+        self._address_by_name_chk.setStyleSheet("QCheckBox { color: #38BDF8; font-size: 11px; font-weight: bold; }")
+        dial_v.addWidget(self._address_by_name_chk)
+
+        self._acoustic_mastering_chk = QCheckBox("Studio Acoustic Mastering (Chest Warmth + De-harshing)")
+        self._acoustic_mastering_chk.setChecked(True)
+        self._acoustic_mastering_chk.setStyleSheet("QCheckBox { color: #34D399; font-size: 11px; font-weight: bold; }")
+        dial_v.addWidget(self._acoustic_mastering_chk)
+
+        right_layout.addWidget(self._dialogue_container)
 
         right_layout.addStretch()
         splitter.addWidget(right_widget)
-        splitter.setSizes([320, 240])
+        splitter.setSizes([320, 280])
 
         root.addWidget(splitter)
 
@@ -346,6 +453,21 @@ class VoicePanel(QWidget):
         else:
             self._speed_val_lbl.setText(f"{self._speed_slider.value() / 10:.1f}×")
         self.auto_speed_changed.emit(bool(checked))
+
+    def _on_master_speed_changed(self, val: int) -> None:
+        # Keep Speaker 1 and Speaker 2 in sync with master voice speed unless manually decoupled
+        if hasattr(self, "_s1_speed_slider"):
+            self._s1_speed_slider.blockSignals(True)
+            self._s1_speed_slider.setValue(val)
+            self._s1_speed_slider.blockSignals(False)
+            if hasattr(self, "_s1_speed_val_lbl"):
+                self._s1_speed_val_lbl.setText(f"{val / 10:.1f}×")
+        if hasattr(self, "_s2_speed_slider"):
+            self._s2_speed_slider.blockSignals(True)
+            self._s2_speed_slider.setValue(val)
+            self._s2_speed_slider.blockSignals(False)
+            if hasattr(self, "_s2_speed_val_lbl"):
+                self._s2_speed_val_lbl.setText(f"{val / 10:.1f}×")
 
     def set_auto_speed(self, enabled: bool) -> None:
         self._auto_speed_chk.setChecked(bool(enabled))
@@ -418,6 +540,33 @@ class VoicePanel(QWidget):
                     self._lang_combo.addItem(lang_names.get(lc, lc.upper()), lc)
                 self._lang_combo.blockSignals(False)
 
+            # Populate Speaker 1 and Speaker 2 dropdowns
+            if hasattr(self, "_s1_voice_combo") and hasattr(self, "_s2_voice_combo"):
+                self._s1_voice_combo.blockSignals(True)
+                self._s2_voice_combo.blockSignals(True)
+                self._s1_voice_combo.clear()
+                self._s2_voice_combo.clear()
+
+                for v in voices:
+                    v_name = v.get("name", v["id"])
+                    self._s1_voice_combo.addItem(f"{v_name}", v["id"])
+                    self._s2_voice_combo.addItem(f"{v_name}", v["id"])
+
+                # Pick smart defaults (Male Seeker for Speaker 1, Female Warm for Speaker 2)
+                s1_default_idx = 0
+                s2_default_idx = 0
+                for idx, v in enumerate(voices):
+                    vid = v.get("id", "")
+                    if "blend:male_introspective" in vid or vid == "am_michael" or (s1_default_idx == 0 and v.get("gender") == "male"):
+                        s1_default_idx = idx
+                    if "blend:female_warm" in vid or vid == "af_heart" or (s2_default_idx == 0 and v.get("gender") == "female"):
+                        s2_default_idx = idx
+
+                self._s1_voice_combo.setCurrentIndex(s1_default_idx)
+                self._s2_voice_combo.setCurrentIndex(s2_default_idx)
+                self._s1_voice_combo.blockSignals(False)
+                self._s2_voice_combo.blockSignals(False)
+
             for voice in voices:
                 card = VoiceCard(voice)
                 card.selected.connect(self._on_voice_selected)
@@ -429,6 +578,68 @@ class VoicePanel(QWidget):
 
         if voices:
             self._on_voice_selected(voices[0]["id"])
+
+    def _set_dialogue_ui_active(self, active: bool) -> None:
+        active = bool(active)
+        if hasattr(self, "_mode_dialogue_btn") and self._mode_dialogue_btn.isChecked() == active and self._dialogue_container.isVisible() == active:
+            return
+        self._mode_solo_btn.setChecked(not active)
+        self._mode_dialogue_btn.setChecked(active)
+        self._solo_container.setVisible(not active)
+        self._dialogue_container.setVisible(active)
+        self.dialogue_mode_changed.emit(active)
+
+    def set_dialogue_mode(self, active: bool) -> None:
+        self._set_dialogue_ui_active(bool(active))
+
+    def _emit_speaker_names(self) -> None:
+        n1 = self._s1_name_edit.text().strip() or "Alex" if hasattr(self, "_s1_name_edit") else "Alex"
+        n2 = self._s2_name_edit.text().strip() or "Maya" if hasattr(self, "_s2_name_edit") else "Maya"
+        self.speaker_names_changed.emit(n1, n2)
+
+    def get_speaker_names(self) -> tuple[str, str]:
+        n1 = self._s1_name_edit.text().strip() or "Alex" if hasattr(self, "_s1_name_edit") else "Alex"
+        n2 = self._s2_name_edit.text().strip() or "Maya" if hasattr(self, "_s2_name_edit") else "Maya"
+        return n1, n2
+
+    def get_speaker_voice_settings(self, speaker_idx: int = 1) -> dict:
+        master_speed = self._speed_slider.value() / 10.0 if hasattr(self, "_speed_slider") else 1.0
+        if speaker_idx == 1:
+            vid = self._s1_voice_combo.currentData() if hasattr(self, "_s1_voice_combo") else self._selected_voice_id
+            sp = (self._s1_speed_slider.value() / 10.0) if hasattr(self, "_s1_speed_slider") else master_speed
+            pt = float(self._s1_pitch_slider.value()) if hasattr(self, "_s1_pitch_slider") else 0.0
+            name = self._s1_name_edit.text().strip() or "Alex" if hasattr(self, "_s1_name_edit") else "Alex"
+        else:
+            vid = self._s2_voice_combo.currentData() if hasattr(self, "_s2_voice_combo") else self._selected_voice_id
+            sp = (self._s2_speed_slider.value() / 10.0) if hasattr(self, "_s2_speed_slider") else master_speed
+            pt = float(self._s2_pitch_slider.value()) if hasattr(self, "_s2_pitch_slider") else 0.0
+            name = self._s2_name_edit.text().strip() or "Maya" if hasattr(self, "_s2_name_edit") else "Maya"
+        return {
+            "name": name,
+            "voice_id": vid or self._selected_voice_id,
+            "speed": max(0.5, min(2.0, sp)),
+            "pitch": pt,
+        }
+
+    def is_dialogue_mode(self) -> bool:
+        return self._mode_dialogue_btn.isChecked() if hasattr(self, "_mode_dialogue_btn") else False
+
+    def _preview_speaker1(self) -> None:
+        vid = self._s1_voice_combo.currentData() if hasattr(self, "_s1_voice_combo") else self._selected_voice_id
+        n1 = self._s1_name_edit.text().strip() or "Alex"
+        n2 = self._s2_name_edit.text().strip() or "Maya"
+        text = f"Have you ever noticed something strange, {n2}? It is darker than you think."
+        self.preview_requested.emit(vid, text)
+        if self._preview_callback:
+            self._preview_callback(vid, text)
+
+    def _preview_speaker2(self) -> None:
+        vid = self._s2_voice_combo.currentData() if hasattr(self, "_s2_voice_combo") else self._selected_voice_id
+        n1 = self._s1_name_edit.text().strip() or "Alex"
+        text = f"And the worst part, {n1}? You know they are confusing you."
+        self.preview_requested.emit(vid, text)
+        if self._preview_callback:
+            self._preview_callback(vid, text)
 
     def _on_card_preview(self, voice_id: str) -> None:
         self._on_voice_selected(voice_id)
@@ -450,22 +661,85 @@ class VoicePanel(QWidget):
         if voice_id in self._cards:
             self._on_voice_selected(voice_id)
 
-    def set_voice_settings(self, speed: float = 1.0, pitch: int = 0, volume: int = 100, auto_speed: bool = False) -> None:
-        self._speed_slider.setValue(max(5, min(20, int(round(speed * 10)))))
+    def set_voice_settings(
+        self,
+        speed: float = 1.0,
+        pitch: int = 0,
+        volume: int = 100,
+        auto_speed: bool = False,
+        dialogue_mode: bool = False,
+        speaker1_name: str = "Alex",
+        speaker2_name: str = "Maya",
+        address_by_name: bool = True,
+        acoustic_mastering: bool = True,
+    ) -> None:
+        val = max(5, min(20, int(round(speed * 10))))
+        self._speed_slider.setValue(val)
+        if hasattr(self, "_s1_speed_slider"):
+            self._s1_speed_slider.setValue(val)
+        if hasattr(self, "_s2_speed_slider"):
+            self._s2_speed_slider.setValue(val)
         self._pitch_slider.setValue(max(-5, min(5, int(pitch))))
         self._volume_slider.setValue(max(0, min(100, int(volume))))
         self._auto_speed_chk.setChecked(bool(auto_speed))
+        if hasattr(self, "_set_dialogue_ui_active"):
+            self._set_dialogue_ui_active(bool(dialogue_mode))
+        if hasattr(self, "_s1_name_edit") and speaker1_name:
+            self._s1_name_edit.setText(speaker1_name)
+        if hasattr(self, "_s2_name_edit") and speaker2_name:
+            self._s2_name_edit.setText(speaker2_name)
+        if hasattr(self, "_address_by_name_chk"):
+            self._address_by_name_chk.setChecked(bool(address_by_name))
+        if hasattr(self, "_acoustic_mastering_chk"):
+            self._acoustic_mastering_chk.setChecked(bool(acoustic_mastering))
 
     def get_selected_voice_id(self) -> str:
         return self._selected_voice_id
 
     def get_voice_settings(self) -> dict:
+        is_dial = self.is_dialogue_mode()
+        s1_name = self._s1_name_edit.text().strip() if hasattr(self, "_s1_name_edit") else "Alex"
+        s2_name = self._s2_name_edit.text().strip() if hasattr(self, "_s2_name_edit") else "Maya"
+        s1_vid = self._s1_voice_combo.currentData() if hasattr(self, "_s1_voice_combo") else self._selected_voice_id
+        s2_vid = self._s2_voice_combo.currentData() if hasattr(self, "_s2_voice_combo") else "blend:female_warm"
+
+        # Smart differentiation: Ensure Speaker 1 and Speaker 2 never share the same voice
+        if not s1_vid:
+            s1_vid = "am_adam" if "am_adam" in self._cards else (self._selected_voice_id or "blend:male_introspective")
+        if not s2_vid or s2_vid == s1_vid:
+            if "female" in str(s1_vid).lower() or str(s1_vid).startswith("af_"):
+                s2_vid = "am_adam" if "am_adam" in self._cards else "blend:male_introspective"
+            else:
+                s2_vid = "af_heart" if "af_heart" in self._cards else "blend:female_warm"
+
+        master_speed = self._speed_slider.value() / 10.0
+        s1_spd = self._s1_speed_slider.value() / 10.0 if hasattr(self, "_s1_speed_slider") else master_speed
+        s1_pit = self._s1_pitch_slider.value() if hasattr(self, "_s1_pitch_slider") else 0
+        s2_spd = self._s2_speed_slider.value() / 10.0 if hasattr(self, "_s2_speed_slider") else master_speed
+        s2_pit = self._s2_pitch_slider.value() if hasattr(self, "_s2_pitch_slider") else 0
+
         return {
             "voice_id": self._selected_voice_id,
             "speed": self._speed_slider.value() / 10.0,
             "auto_speed": self._auto_speed_chk.isChecked(),
             "pitch": self._pitch_slider.value(),
             "volume": self._volume_slider.value(),
+            # Two-voice dialogue parameters
+            "dialogue_mode": is_dial,
+            "speaker1": {
+                "name": s1_name or "Alex",
+                "voice_id": s1_vid or self._selected_voice_id,
+                "speed": s1_spd,
+                "pitch": s1_pit,
+            },
+            "speaker2": {
+                "name": s2_name or "Maya",
+                "voice_id": s2_vid or "blend:female_warm",
+                "speed": s2_spd,
+                "pitch": s2_pit,
+            },
+            "address_by_name": self._address_by_name_chk.isChecked() if hasattr(self, "_address_by_name_chk") else True,
+            "acoustic_mastering": self._acoustic_mastering_chk.isChecked() if hasattr(self, "_acoustic_mastering_chk") else True,
         }
 
     def set_preview_callback(self, callback: Callable[[str, str], None]) -> None:

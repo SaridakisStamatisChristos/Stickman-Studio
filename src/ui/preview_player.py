@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QIcon, QPixmap
 try:
     from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+    from PySide6.QtMultimediaWidgets import QVideoWidget
     _HAS_QT_MEDIA = True
 except Exception:
     _HAS_QT_MEDIA = False
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSlider,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -130,18 +132,24 @@ class PreviewPlayer(QWidget):
         self._fps: float = 10.0
         self._duration: float = 0.0
         self._playing: bool = False
+        self._native_mode: bool = False
+        self._is_user_seeking: bool = False
         self._ffmpeg: Optional[str] = _find_ffmpeg(ffmpeg_path)
-        self._audio_player = None
-        self._audio_output = None
+
+        self._media_player: Optional[QMediaPlayer] = None
+        self._audio_output: Optional[QAudioOutput] = None
+        self._video_widget: Optional[QVideoWidget] = None
+        self._view_stack: Optional[QStackedWidget] = None
+
         if _HAS_QT_MEDIA:
             try:
                 self._audio_output = QAudioOutput(self)
-                self._audio_output.setVolume(0.9)
-                self._audio_player = QMediaPlayer(self)
-                self._audio_player.setAudioOutput(self._audio_output)
+                self._audio_output.setVolume(1.0)
+                self._media_player = QMediaPlayer(self)
+                self._media_player.setAudioOutput(self._audio_output)
             except Exception:
-                self._audio_player = None
                 self._audio_output = None
+                self._media_player = None
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._advance_frame)
@@ -157,7 +165,9 @@ class PreviewPlayer(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(6)
 
-        # Video display
+        # Video display stack: index 0 = placeholder/frame fallback, index 1 = native video
+        self._view_stack = QStackedWidget()
+
         self._display = QLabel()
         self._display.setAlignment(Qt.AlignCenter)
         self._display.setMinimumHeight(300)
@@ -166,13 +176,31 @@ class PreviewPlayer(QWidget):
             "QLabel { background: #050508; border: 1px solid #0f3460; border-radius: 6px; color: #444; font-size: 16px; }"
         )
         self._display.setText("No video loaded")
-        root.addWidget(self._display, stretch=1)
+        self._view_stack.addWidget(self._display)
+
+        if _HAS_QT_MEDIA and self._media_player is not None:
+            try:
+                self._video_widget = QVideoWidget()
+                self._video_widget.setMinimumHeight(300)
+                self._video_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+                self._video_widget.setStyleSheet("background: #050508; border-radius: 6px;")
+                self._media_player.setVideoOutput(self._video_widget)
+                self._media_player.positionChanged.connect(self._on_player_position_changed)
+                self._media_player.durationChanged.connect(self._on_player_duration_changed)
+                self._media_player.playbackStateChanged.connect(self._on_playback_state_changed)
+                self._view_stack.addWidget(self._video_widget)
+            except Exception:
+                self._video_widget = None
+
+        root.addWidget(self._view_stack, stretch=1)
 
         # Progress slider
         self._seek_slider = QSlider(Qt.Horizontal)
         self._seek_slider.setRange(0, 1000)
         self._seek_slider.setValue(0)
         self._seek_slider.sliderMoved.connect(self._on_seek)
+        self._seek_slider.sliderPressed.connect(self._on_seek_pressed)
+        self._seek_slider.sliderReleased.connect(self._on_seek_released)
         self._seek_slider.setEnabled(False)
         root.addWidget(self._seek_slider)
 
@@ -216,7 +244,7 @@ class PreviewPlayer(QWidget):
         root.addLayout(ctrl_row)
 
     # ------------------------------------------------------------------
-    # Frame extraction
+    # Frame extraction (Fallback mode)
     # ------------------------------------------------------------------
 
     def _extract_frames(self) -> bool:
@@ -257,7 +285,7 @@ class PreviewPlayer(QWidget):
         self._total_frames = len(self._frame_paths)
         self._fps = 10.0  # preview fps
 
-        # Also extract audio WAV for synchronized offline playback via winsound
+        # Also extract audio WAV for synchronized offline playback
         self._audio_wav_path = os.path.join(self._temp_dir.name, "preview_audio.wav")
         try:
             subprocess.run(
@@ -274,10 +302,10 @@ class PreviewPlayer(QWidget):
 
     def _cleanup_temp(self) -> None:
         self._timer.stop()
-        if self._audio_player is not None:
+        if self._media_player is not None:
             try:
-                self._audio_player.stop()
-                self._audio_player.setSource(QUrl())
+                self._media_player.stop()
+                self._media_player.setSource(QUrl())
             except Exception:
                 pass
         if self._temp_dir is not None:
@@ -320,19 +348,82 @@ class PreviewPlayer(QWidget):
         current_sec = self._current_frame / self._fps if self._fps else 0
         self._time_lbl.setText(_fmt_time(current_sec))
         if self._total_frames > 0:
+            self._seek_slider.blockSignals(True)
             self._seek_slider.setValue(int(self._current_frame / self._total_frames * 1000))
+            self._seek_slider.blockSignals(False)
+
+    def _on_seek_pressed(self) -> None:
+        self._is_user_seeking = True
+
+    def _on_seek_released(self) -> None:
+        self._is_user_seeking = False
+        if self._native_mode and self._media_player is not None:
+            dur_ms = self._media_player.duration() or int(self._duration * 1000)
+            if dur_ms > 0:
+                target_ms = int(self._seek_slider.value() / 1000.0 * dur_ms)
+                self._media_player.setPosition(target_ms)
+                self._time_lbl.setText(_fmt_time(target_ms / 1000.0))
 
     def _on_seek(self, slider_value: int) -> None:
+        if self._native_mode and self._media_player is not None:
+            dur_ms = self._media_player.duration() or int(self._duration * 1000)
+            if dur_ms > 0:
+                target_ms = int(slider_value / 1000.0 * dur_ms)
+                self._media_player.setPosition(target_ms)
+                self._time_lbl.setText(_fmt_time(target_ms / 1000.0))
+            return
+
         if self._total_frames > 0:
             self._current_frame = min(self._total_frames - 1, int(slider_value / 1000 * self._total_frames))
             self._show_frame(self._current_frame)
             self._update_time_ui()
-            if self._audio_player is not None:
+            if self._media_player is not None:
                 try:
                     pos_ms = int((self._current_frame / max(1.0, self._fps)) * 1000)
-                    self._audio_player.setPosition(pos_ms)
+                    self._media_player.setPosition(pos_ms)
                 except Exception:
                     pass
+
+    # ------------------------------------------------------------------
+    # QtMultimedia Native Player Slots
+    # ------------------------------------------------------------------
+
+    def _on_player_position_changed(self, pos_ms: int) -> None:
+        if not self._native_mode or self._is_user_seeking:
+            return
+        sec = pos_ms / 1000.0
+        self._time_lbl.setText(_fmt_time(sec))
+        dur_ms = self._media_player.duration() if self._media_player else 0
+        if dur_ms <= 0:
+            dur_ms = int(self._duration * 1000)
+        if dur_ms > 0:
+            val = min(1000, max(0, int((pos_ms / dur_ms) * 1000)))
+            self._seek_slider.blockSignals(True)
+            self._seek_slider.setValue(val)
+            self._seek_slider.blockSignals(False)
+
+    def _on_player_duration_changed(self, dur_ms: int) -> None:
+        if dur_ms > 0:
+            self._duration = dur_ms / 1000.0
+            self._total_lbl.setText(_fmt_time(self._duration))
+
+    def _on_playback_state_changed(self, state: QMediaPlayer.PlaybackState) -> None:
+        if not self._native_mode:
+            return
+        if state == QMediaPlayer.PlaybackState.PlayingState:
+            self._playing = True
+            self._play_btn.setText("⏸  Pause")
+            self._stop_btn.setEnabled(True)
+        elif state == QMediaPlayer.PlaybackState.PausedState:
+            self._playing = False
+            self._play_btn.setText("▶  Play")
+        elif state == QMediaPlayer.PlaybackState.StoppedState:
+            self._playing = False
+            self._play_btn.setText("▶  Play")
+            dur_ms = self._media_player.duration() if self._media_player else 0
+            pos_ms = self._media_player.position() if self._media_player else 0
+            if dur_ms > 0 and pos_ms >= dur_ms - 400:
+                self.playback_finished.emit()
 
     # ------------------------------------------------------------------
     # Action slots
@@ -368,18 +459,48 @@ class PreviewPlayer(QWidget):
     # ------------------------------------------------------------------
 
     def load_video(self, path: str) -> None:
-        """Load a video file and extract preview frames."""
+        """Load a video file for synchronized preview."""
         self.stop()
         self._video_path = path
+        if not path or not os.path.isfile(path):
+            self._display.setText("Video file not found.")
+            if self._view_stack:
+                self._view_stack.setCurrentWidget(self._display)
+            return
+
         self._duration = _get_video_duration(path, self._ffmpeg)
         self._total_lbl.setText(_fmt_time(self._duration))
+
+        # 1. Prefer native hardware playback (zero extraction lag, 100% sync)
+        if self._media_player is not None and self._video_widget is not None:
+            try:
+                abs_path = os.path.abspath(path)
+                self._media_player.setSource(QUrl.fromLocalFile(abs_path))
+                if self._view_stack:
+                    self._view_stack.setCurrentWidget(self._video_widget)
+                self._native_mode = True
+                self._seek_slider.setEnabled(True)
+                self._play_btn.setEnabled(True)
+                self._stop_btn.setEnabled(True)
+                self._explorer_btn.setEnabled(True)
+                self._export_btn.setEnabled(True)
+                self._seek_slider.setValue(0)
+                self._time_lbl.setText("0:00")
+                return
+            except Exception:
+                pass  # Fall back to frame extraction
+
+        # 2. Frame-based fallback
+        self._native_mode = False
+        if self._view_stack:
+            self._view_stack.setCurrentWidget(self._display)
         self._display.setText(f"Extracting preview frames…\n{os.path.basename(path)}")
 
         success = self._extract_frames()
         if success:
-            if self._audio_player is not None and self._audio_wav_path and os.path.exists(self._audio_wav_path):
+            if self._media_player is not None and self._audio_wav_path and os.path.exists(self._audio_wav_path):
                 try:
-                    self._audio_player.setSource(QUrl.fromLocalFile(self._audio_wav_path))
+                    self._media_player.setSource(QUrl.fromLocalFile(self._audio_wav_path))
                 except Exception:
                     pass
             self._show_frame(0)
@@ -393,9 +514,20 @@ class PreviewPlayer(QWidget):
             if not self._ffmpeg:
                 pass  # message already set
             else:
-                self._display.setText("Failed to extract frames.")
+                self._display.setText("Failed to extract preview frames.")
 
     def play(self) -> None:
+        if self._native_mode and self._media_player is not None:
+            dur = self._media_player.duration()
+            pos = self._media_player.position()
+            if dur > 0 and pos >= dur - 200:
+                self._media_player.setPosition(0)
+            self._media_player.play()
+            self._playing = True
+            self._play_btn.setText("⏸  Pause")
+            self._stop_btn.setEnabled(True)
+            return
+
         if not self._frame_paths:
             return
         if self._current_frame >= self._total_frames:
@@ -405,11 +537,11 @@ class PreviewPlayer(QWidget):
         self._timer.start(interval_ms)
         self._play_btn.setText("⏸  Pause")
         self._stop_btn.setEnabled(True)
-        if self._audio_player is not None and self._audio_wav_path and os.path.exists(self._audio_wav_path):
+        if self._media_player is not None and self._audio_wav_path and os.path.exists(self._audio_wav_path):
             try:
                 pos_ms = int((self._current_frame / max(1.0, self._fps)) * 1000)
-                self._audio_player.setPosition(pos_ms)
-                self._audio_player.play()
+                self._media_player.setPosition(pos_ms)
+                self._media_player.play()
                 return
             except Exception:
                 pass
@@ -422,11 +554,14 @@ class PreviewPlayer(QWidget):
 
     def pause(self) -> None:
         self._playing = False
-        self._timer.stop()
         self._play_btn.setText("▶  Play")
-        if self._audio_player is not None:
+        if self._native_mode and self._media_player is not None:
+            self._media_player.pause()
+            return
+        self._timer.stop()
+        if self._media_player is not None:
             try:
-                self._audio_player.pause()
+                self._media_player.pause()
             except Exception:
                 pass
         try:
@@ -437,11 +572,18 @@ class PreviewPlayer(QWidget):
 
     def stop(self) -> None:
         self._playing = False
+        self._play_btn.setText("▶  Play")
+        self._seek_slider.setValue(0)
+        self._time_lbl.setText("0:00")
+        if self._native_mode and self._media_player is not None:
+            self._media_player.stop()
+            self._media_player.setPosition(0)
+            return
         self._timer.stop()
-        if self._audio_player is not None:
+        if self._media_player is not None:
             try:
-                self._audio_player.stop()
-                self._audio_player.setPosition(0)
+                self._media_player.stop()
+                self._media_player.setPosition(0)
             except Exception:
                 pass
         try:
@@ -450,13 +592,12 @@ class PreviewPlayer(QWidget):
         except Exception:
             pass
         self._current_frame = 0
-        self._play_btn.setText("▶  Play")
         if self._frame_paths:
             self._show_frame(0)
-        self._seek_slider.setValue(0)
-        self._time_lbl.setText("0:00")
 
     def get_current_time(self) -> float:
+        if self._native_mode and self._media_player is not None:
+            return self._media_player.position() / 1000.0
         return self._current_frame / self._fps if self._fps else 0.0
 
     def closeEvent(self, event) -> None:  # type: ignore[override]

@@ -118,10 +118,7 @@ class VideoEncoder:
         # Optional audio input
         if audio_path and Path(audio_path).exists():
             cmd += ["-i", audio_path]
-            map_flags = ["-map", "0:v", "-map", "1:a"]
-            # NOTE: Do NOT use -shortest here — it truncates video when audio is
-            # slightly shorter than video. We pad audio duration in the mixer instead.
-            # Using apad filter via -af on input 1 to extend audio if needed.
+            map_flags = ["-map", "0:v", "-map", "1:a", "-shortest"]
             audio_codec = ["-c:a", "aac", "-b:a", "128k"]
         else:
             map_flags = ["-map", "0:v"]

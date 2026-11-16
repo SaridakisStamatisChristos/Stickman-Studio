@@ -18,6 +18,8 @@ from typing import Any, Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
+from engine.text_sanitizer import VisualTextSanitizer
+
 
 # ---------------------------------------------------------------------------
 # Colour & Texture Helpers
@@ -257,11 +259,37 @@ class AssetLibrary:
             "SNIPPED_THREAD_SUNRISE": lambda d, _x, _y, _w, _h: self._draw_snipped_thread_sunrise(d, _x, _y, _w, _h, t=anim),
             "CHASM_CRACK":            lambda d, _x, _y, _w, _h: self._draw_chasm_crack(d, _x, _y, _w, _h, t=anim),
             "EGO_TROPHY":             lambda d, _x, _y, _w, _h: self._draw_ego_trophy(d, _x, _y, _w, _h, t=anim),
+            # Psychological Narrative & Relationship Assets (Atharv Hatwar)
+            "MESSAGE_BUBBLE_INCOMING": lambda d, _x, _y, _w, _h: self._draw_message_bubble_incoming(d, _x, _y, _w, _h, t=anim),
+            "MESSAGE_BUBBLES_STACK":   lambda d, _x, _y, _w, _h: self._draw_message_bubbles_stack(d, _x, _y, _w, _h, t=anim),
+            "SHORT_REPLY_BUBBLE":      lambda d, _x, _y, _w, _h: self._draw_short_reply_bubble(d, _x, _y, _w, _h, t=anim),
+            "MISSED_CALL_ICON":        lambda d, _x, _y, _w, _h: self._draw_missed_call_icon(d, _x, _y, _w, _h, t=anim),
+            "LIGHTHOUSE_FOG_BEAM":     lambda d, _x, _y, _w, _h: self._draw_lighthouse_fog_beam(d, _x, _y, _w, _h, t=anim),
+            "DOPAMINE_SPIKE_CHART":    lambda d, _x, _y, _w, _h: self._draw_dopamine_spike_chart(d, _x, _y, _w, _h, t=anim),
+            "SPLIT_MIRROR_IDEAL":      lambda d, _x, _y, _w, _h: self._draw_split_mirror_ideal(d, _x, _y, _w, _h, t=anim),
+            "PEDESTAL_BUST_TRAP":      lambda d, _x, _y, _w, _h: self._draw_pedestal_bust_trap(d, _x, _y, _w, _h, t=anim),
         }
 
         fn = dispatchers.get(name)
         if fn:
             fn(draw, x, y, width, height)
+        else:
+            try:
+                from engine.procedural_object_engine import ProceduralObjectEngine
+                ProceduralObjectEngine.draw_object(
+                    draw=draw,
+                    asset_name=name,
+                    x=x,
+                    y=y,
+                    w=width,
+                    h=height,
+                    color=col,
+                    ink=self._ink(),
+                    line_width=int(self.sp.get("line_width", 3)),
+                    t=anim,
+                )
+            except Exception:
+                pass
 
     def _ink(self) -> str:
         fg = self.sp.get("fg", "#111111")
@@ -698,6 +726,7 @@ class AssetLibrary:
         draw.polygon(tail_pts, fill=b_bg, outline=b_outline, width=lw)
         draw.line([(x + w // 3 + 2, y + bubble_h), (x + w // 3 + w // 9 - 2, y + bubble_h)], fill=b_bg, width=lw + 2)
 
+        text = VisualTextSanitizer.sanitize_bubble_text(text, kind="speech")
         if text:
             # Multi-line word-wrapped legible text layout
             lines = textwrap.wrap(text, width=20) if len(text) > 18 else [text]
@@ -735,6 +764,7 @@ class AssetLibrary:
         for cr, cx_off, cy_off in [(5, w // 3, bubble_h + h // 10), (7, w // 4, bubble_h + h // 4), (4, w // 5, bubble_h + h // 3)]:
             bcx, bcy = x + cx_off, y + cy_off
             draw.ellipse([bcx - cr, bcy - cr, bcx + cr, bcy + cr], fill=b_bg, outline=b_outline, width=max(1, lw // 2))
+        text = VisualTextSanitizer.sanitize_bubble_text(text, kind="thought")
         if text:
             # Multi-line word-wrapped legible text layout
             lines = textwrap.wrap(text, width=20) if len(text) > 18 else [text]
@@ -2191,24 +2221,33 @@ class AssetLibrary:
     def _draw_thought_cloud(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
         ink = self._ink()
         lw = max(2, int(self.sp.get("line_width", 3.0)))
-        draw.ellipse([x + int(w * 0.12), y + int(h * 0.92), x + int(w * 0.18), y + h], fill=_hex_to_rgba("#F1F5F9", 220), outline=ink, width=max(1, lw - 1))
-        draw.ellipse([x + int(w * 0.20), y + int(h * 0.80), x + int(w * 0.28), y + int(h * 0.88)], fill=_hex_to_rgba("#F1F5F9", 220), outline=ink, width=max(1, lw - 1))
-        cw = int(w * 0.85)
-        ch = int(h * 0.75)
+        w = max(40, w)
+        h = max(30, h)
+        draw.ellipse([x + int(w * 0.12), y + int(h * 0.90), max(x + int(w * 0.12) + 4, x + int(w * 0.18)), y + h], fill=_hex_to_rgba("#F1F5F9", 220), outline=ink, width=max(1, lw - 1))
+        draw.ellipse([x + int(w * 0.20), y + int(h * 0.78), max(x + int(w * 0.20) + 6, x + int(w * 0.28)), max(y + int(h * 0.78) + 6, y + int(h * 0.88))], fill=_hex_to_rgba("#F1F5F9", 220), outline=ink, width=max(1, lw - 1))
+        cw = max(30, int(w * 0.85))
+        ch = max(20, int(h * 0.75))
         cx0 = x + int(w * 0.10)
         cy0 = y
-        draw.rounded_rectangle([cx0 + 10, cy0 + 12, cx0 + cw - 10, cy0 + ch - 12], radius=18, fill=_hex_to_rgba("#F8FAFC", 235), outline=ink, width=lw)
+        pad_x = min(8, cw // 4)
+        pad_y = min(8, ch // 4)
+        rx0 = cx0 + pad_x
+        ry0 = cy0 + pad_y
+        rx1 = max(rx0 + 10, cx0 + cw - pad_x)
+        ry1 = max(ry0 + 10, cy0 + ch - pad_y)
+        rad = max(4, min(18, (rx1 - rx0) // 3, (ry1 - ry0) // 3))
+        draw.rounded_rectangle([rx0, ry0, rx1, ry1], radius=rad, fill=_hex_to_rgba("#F8FAFC", 235), outline=ink, width=lw)
         lobes = [
-            (cx0 + int(cw * 0.25), cy0 + 8, int(cw * 0.22)),
-            (cx0 + int(cw * 0.50), cy0 + 4, int(cw * 0.26)),
-            (cx0 + int(cw * 0.75), cy0 + 10, int(cw * 0.20)),
-            (cx0 + int(cw * 0.15), cy0 + int(ch * 0.50), int(cw * 0.20)),
-            (cx0 + int(cw * 0.85), cy0 + int(ch * 0.50), int(cw * 0.20)),
+            (cx0 + int(cw * 0.25), cy0 + 8, max(8, int(cw * 0.22))),
+            (cx0 + int(cw * 0.50), cy0 + 4, max(10, int(cw * 0.26))),
+            (cx0 + int(cw * 0.75), cy0 + 10, max(8, int(cw * 0.20))),
+            (cx0 + int(cw * 0.15), cy0 + int(ch * 0.50), max(8, int(cw * 0.20))),
+            (cx0 + int(cw * 0.85), cy0 + int(ch * 0.50), max(8, int(cw * 0.20))),
         ]
         for lx, ly, lr in lobes:
             draw.ellipse([lx - lr // 2, ly - lr // 2, lx + lr // 2, ly + lr // 2], fill=_hex_to_rgba("#F8FAFC", 235))
             draw.arc([lx - lr // 2, ly - lr // 2, lx + lr // 2, ly + lr // 2], start=180, end=360, fill=ink, width=lw)
-        fnt = _load_ui_font(max(11, int(ch * 0.24)), bold=True)
+        fnt = _load_ui_font(max(10, int(ch * 0.24)), bold=True)
         draw.text((cx0 + cw // 2, cy0 + ch // 2), "MEMORY", fill=_hex_to_rgba("#64748B", 200), font=fnt, anchor="mm")
 
     def _draw_split_divider(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
@@ -2526,6 +2565,115 @@ class AssetLibrary:
         cx = x + w // 2
         cy = y + int(h * 0.45)
         draw.ellipse([cx - 8, cy - 8, cx + 8, cy + 8], fill=acc)
+
+    def _draw_message_bubble_incoming(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#38BDF8")
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        pop = min(1.0, t * 1.4)
+        bw, bh = int(w * pop), int(h * pop)
+        draw.rounded_rectangle([x, y, x + bw, y + bh], radius=max(6, bh // 4), fill="#E0F2FE", outline=ink, width=lw)
+        # Text simulation line inside
+        line_w = int(bw * 0.65)
+        draw.line([(x + int(bw * 0.18), y + bh // 2), (x + int(bw * 0.18) + line_w, y + bh // 2)], fill=acc, width=max(2, lw))
+        # Tail on left
+        tail_pts = [(x, y + int(bh * 0.6)), (x - max(6, int(w * 0.08)), y + int(bh * 0.8)), (x + max(4, int(w * 0.05)), y + int(bh * 0.8))]
+        draw.polygon(tail_pts, fill="#E0F2FE", outline=ink)
+
+    def _draw_message_bubbles_stack(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        sub_h = h // 3
+        self._draw_message_bubble_incoming(draw, x, y, int(w * 0.85), sub_h - 4, t=t)
+        self._draw_message_bubble_incoming(draw, x + int(w * 0.1), y + sub_h, int(w * 0.9), sub_h - 4, t=t)
+        self._draw_message_bubble_incoming(draw, x, y + sub_h * 2, w, sub_h - 4, t=t)
+
+    def _draw_short_reply_bubble(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        lw = max(2, int(self.sp.get("line_width", 2.5)))
+        bw = max(24, int(w * 0.45))
+        bh = max(18, int(h * 0.55))
+        draw.rounded_rectangle([x + w - bw, y, x + w, y + bh], radius=max(4, bh // 4), fill="#F1F5F9", outline=ink, width=lw)
+        # Dot dot or single character line
+        draw.ellipse([x + w - bw + 8, y + bh // 2 - 2, x + w - bw + 12, y + bh // 2 + 2], fill=ink)
+        draw.ellipse([x + w - bw + 16, y + bh // 2 - 2, x + w - bw + 20, y + bh // 2 + 2], fill=ink)
+
+    def _draw_missed_call_icon(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = "#EF4444"
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        cx, cy = x + w // 2, y + h // 2
+        r = min(w, h) // 2
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill="#FEE2E2", outline=ink, width=lw)
+        # Diagonal missed arrow
+        draw.line([(cx + int(r * 0.35), cy - int(r * 0.35)), (cx - int(r * 0.35), cy + int(r * 0.35))], fill=ink, width=lw + 1)
+        draw.polygon([(cx - int(r * 0.35), cy + int(r * 0.35)), (cx - int(r * 0.35), cy + int(r * 0.05)), (cx - int(r * 0.05), cy + int(r * 0.35))], fill=ink)
+
+    def _draw_lighthouse_fog_beam(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#FBBF24")
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        # Lighthouse tower
+        bx, by = x + int(w * 0.15), y + h
+        tx, ty = x + int(w * 0.22), y + int(h * 0.35)
+        pts = [(bx - int(w * 0.08), by), (bx + int(w * 0.08), by), (tx + int(w * 0.05), ty), (tx - int(w * 0.05), ty)]
+        draw.polygon(pts, fill="#F8FAFC", outline=ink, width=lw)
+        # Lantern room
+        draw.rectangle([tx - int(w * 0.06), ty - int(h * 0.12), tx + int(w * 0.06), ty], fill="#FEF08A", outline=ink, width=lw)
+        # Radiant sweeping beam cutting through darkness
+        beam_pulse = 0.85 + 0.15 * math.sin(t * 6.0)
+        beam_pts = [
+            (tx + int(w * 0.06), ty - int(h * 0.06)),
+            (x + w, y + int(h * 0.05)),
+            (x + w, y + int(h * 0.65)),
+        ]
+        draw.polygon(beam_pts, fill=_hex_to_rgba(acc, int(85 * beam_pulse)))
+
+    def _draw_dopamine_spike_chart(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        acc = self.sp.get("accent", "#10B981")
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        # Baseline axis
+        draw.line([(x, y + int(h * 0.8)), (x + w, y + int(h * 0.8))], fill=ink, width=lw)
+        # Waveform with intermittent massive spike!
+        pts = [
+            (x, y + int(h * 0.78)),
+            (x + int(w * 0.2), y + int(h * 0.75)),
+            (x + int(w * 0.35), y + int(h * 0.77)),
+            (x + int(w * 0.5), y + int(h * 0.15)),  # SPIKE!
+            (x + int(w * 0.62), y + int(h * 0.76)),
+            (x + int(w * 0.8), y + int(h * 0.74)),
+            (x + w, y + int(h * 0.78)),
+        ]
+        draw.line(pts, fill=acc, width=lw + 1, joint="curve")
+        # Star at top of spike
+        sx, sy = x + int(w * 0.5), y + int(h * 0.15)
+        draw.ellipse([sx - 8, sy - 8, sx + 8, sy + 8], fill="#FBBF24", outline=ink, width=lw)
+
+    def _draw_split_mirror_ideal(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        cx, cy = x + w // 2, y + h // 2
+        rw, rh = int(w * 0.38), int(h * 0.44)
+        # Mirror frame
+        draw.ellipse([cx - rw, cy - rh, cx + rw, cy + rh], fill="#F8FAFC", outline=ink, width=lw + 1)
+        # Split line down center
+        draw.line([(cx, cy - rh), (cx, cy + rh)], fill=ink, width=lw)
+        # Left side: warm reflection glow
+        draw.chord([cx - rw, cy - rh, cx + rw, cy + rh], start=90, end=270, fill=_hex_to_rgba("#FEF08A", 70))
+        # Right side: cold darker reality
+        draw.chord([cx - rw, cy - rh, cx + rw, cy + rh], start=270, end=90, fill=_hex_to_rgba("#94A3B8", 90))
+
+    def _draw_pedestal_bust_trap(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, t: float = 1.0) -> None:
+        ink = self._ink()
+        lw = max(2, int(self.sp.get("line_width", 3.0)))
+        # Pedestal base
+        px1, py1 = x + int(w * 0.25), y + int(h * 0.62)
+        px2, py2 = x + int(w * 0.75), y + h
+        draw.rectangle([px1, py1, px2, py2], fill="#E2E8F0", outline=ink, width=lw)
+        # Bust head on pedestal
+        bx, by = x + w // 2, y + int(h * 0.35)
+        br = int(min(w, h) * 0.18)
+        draw.ellipse([bx - br, by - br, bx + br, by + br], fill="#FFFFFF", outline=ink, width=lw)
+        # Bust shoulders
+        draw.arc([bx - int(br * 1.5), by, bx + int(br * 1.5), py1], start=180, end=360, fill="#FFFFFF", width=lw)
 
     @staticmethod
     def _bg_abstract(draw: ImageDraw.ImageDraw, w: int, h: int, sp: dict) -> None:

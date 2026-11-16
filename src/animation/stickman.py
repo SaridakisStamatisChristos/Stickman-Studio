@@ -81,6 +81,16 @@ POSE_SEQUENCES: dict[str, list[str]] = {
     "PRESENT_CHART":   ["STAND", "PRESENT_ANTICIPATE", "PRESENT_POINT", "PRESENT_TRACE", "PRESENT_TAP", "PRESENT_GESTURE"],
     "SCROLL_PHONE":    ["PHONE_HOLD", "PHONE_SCROLL", "PHONE_TILT", "PHONE_TAP", "PHONE_SCROLL"],
     "CROSS_ARMS":      ["STAND", "CROSS_ARMS", "CROSS_TAP", "CROSS_ARMS"],
+    # Story-Driven Contextual Actions (Atharv Hatwar)
+    "TEXTING_PHONE":       ["TEXTING_PHONE", "PHONE_SCROLL", "TEXTING_PHONE", "PHONE_TAP"],
+    "LOOK_PHONE":          ["LOOK_PHONE", "LOOK_PHONE", "THINK_TILT", "LOOK_PHONE"],
+    "CONFUSED_WONDERING":  ["CONFUSED_WONDERING", "CONFUSED", "SHRUG_UP", "CONFUSED_WONDERING"],
+    "CHECK_NOTIFICATIONS": ["LOOK_PHONE", "CHECK_NOTIFICATIONS", "CHECK_NOTIFICATIONS", "LOOK_PHONE"],
+    "HUG":                 ["STAND", "HUG", "HUG", "STAND"],
+    "FALL_IN_LOVE":        ["STAND", "FALL_IN_LOVE", "CELEBRATE", "FALL_IN_LOVE"],
+    "TURNING_AWAY":        ["STAND", "TURNING_AWAY", "TURNING_AWAY", "STAND"],
+    "WAITING":             ["STAND", "WAITING", "CROSS_ARMS", "WAITING"],
+    "DISAPPOINTED":        ["STAND", "DISAPPOINTED", "BOW", "DISAPPOINTED"],
 }
 
 # Raw canonical joint templates relative to hip center (0, 0)
@@ -508,6 +518,87 @@ _BASE_POSES: dict[str, dict[str, tuple[float, float]]] = {
         "hips": (0, 0),
         "l_knee": (-11, 27), "r_knee": (11, 27),
         "l_foot": (-14, 56), "r_foot": (14, 56),
+    },
+    "TEXTING_PHONE": {
+        "head": (0, -60), "neck": (0, -42),
+        "l_shoulder": (-14, -38), "r_shoulder": (14, -38),
+        "l_elbow": (-12, -22), "r_elbow": (12, -22),
+        "l_hand": (-5, -24), "r_hand": (5, -24),
+        "hips": (0, 0),
+        "l_knee": (-10, 27), "r_knee": (10, 27),
+        "l_foot": (-13, 56), "r_foot": (13, 56),
+    },
+    "LOOK_PHONE": {
+        "head": (2, -61), "neck": (1, -43),
+        "l_shoulder": (-15, -39), "r_shoulder": (15, -39),
+        "l_elbow": (-18, -20), "r_elbow": (14, -22),
+        "l_hand": (-16, 2), "r_hand": (10, -25),
+        "hips": (0, 0),
+        "l_knee": (-10, 27), "r_knee": (10, 27),
+        "l_foot": (-13, 56), "r_foot": (13, 56),
+    },
+    "CONFUSED_WONDERING": {
+        "head": (4, -63), "neck": (2, -43),
+        "l_shoulder": (-15, -39), "r_shoulder": (15, -39),
+        "l_elbow": (-22, -18), "r_elbow": (26, -26),
+        "l_hand": (-18, 2), "r_hand": (14, -48),
+        "hips": (0, 0),
+        "l_knee": (-10, 27), "r_knee": (10, 27),
+        "l_foot": (-13, 56), "r_foot": (13, 56),
+    },
+    "CHECK_NOTIFICATIONS": {
+        "head": (0, -65), "neck": (0, -44),
+        "l_shoulder": (-15, -39), "r_shoulder": (15, -39),
+        "l_elbow": (-16, -24), "r_elbow": (16, -24),
+        "l_hand": (-8, -34), "r_hand": (8, -34),
+        "hips": (0, 0),
+        "l_knee": (-10, 27), "r_knee": (10, 27),
+        "l_foot": (-13, 56), "r_foot": (13, 56),
+    },
+    "HUG": {
+        "head": (0, -64), "neck": (0, -44),
+        "l_shoulder": (-14, -39), "r_shoulder": (14, -39),
+        "l_elbow": (-24, -20), "r_elbow": (24, -20),
+        "l_hand": (-12, -12), "r_hand": (12, -12),
+        "hips": (0, 0),
+        "l_knee": (-10, 27), "r_knee": (10, 27),
+        "l_foot": (-13, 56), "r_foot": (13, 56),
+    },
+    "FALL_IN_LOVE": {
+        "head": (3, -64), "neck": (1, -44),
+        "l_shoulder": (-15, -39), "r_shoulder": (15, -39),
+        "l_elbow": (-10, -26), "r_elbow": (10, -26),
+        "l_hand": (-4, -32), "r_hand": (4, -32),
+        "hips": (0, 0),
+        "l_knee": (-10, 27), "r_knee": (10, 27),
+        "l_foot": (-13, 56), "r_foot": (13, 56),
+    },
+    "TURNING_AWAY": {
+        "head": (-5, -64), "neck": (-2, -44),
+        "l_shoulder": (-16, -39), "r_shoulder": (14, -39),
+        "l_elbow": (-24, -18), "r_elbow": (18, -18),
+        "l_hand": (-26, 4), "r_hand": (18, 4),
+        "hips": (0, 0),
+        "l_knee": (-12, 27), "r_knee": (8, 27),
+        "l_foot": (-16, 56), "r_foot": (10, 56),
+    },
+    "WAITING": {
+        "head": (0, -64), "neck": (0, -44),
+        "l_shoulder": (-16, -39), "r_shoulder": (16, -39),
+        "l_elbow": (-20, -22), "r_elbow": (20, -22),
+        "l_hand": (10, -20), "r_hand": (-10, -20),
+        "hips": (0, 0),
+        "l_knee": (-10, 27), "r_knee": (14, 25),
+        "l_foot": (-13, 56), "r_foot": (18, 54),
+    },
+    "DISAPPOINTED": {
+        "head": (0, -56), "neck": (0, -38),
+        "l_shoulder": (-14, -34), "r_shoulder": (14, -34),
+        "l_elbow": (-18, -14), "r_elbow": (18, -14),
+        "l_hand": (-18, 8), "r_hand": (18, 8),
+        "hips": (0, 2),
+        "l_knee": (-10, 28), "r_knee": (10, 28),
+        "l_foot": (-13, 56), "r_foot": (13, 56),
     },
     # Dynamic Keyframe Sequences Supporting Poses (Atharv Hatwar)
     "PRESENT_ANTICIPATE": {
@@ -1253,16 +1344,18 @@ class StickmanRenderer:
         mouth_open = speaking and (talk_phase != 0)
         face_fg = acc if outfit == "noir_hoodie" else ("#0F172A" if outfit in ("survival_hoodie", "survival_hoodie_alt") else fg)
         use_sclera = outfit in ("hide_tunic", "hide_tunic_alt", "samurai_kimono", "samurai_hakama", "presenter_suit") or (self.style == "b1_minimal_line_art" and emotion in ("SURPRISED", "ANGRY", "CONFUSED"))
+        is_female_char = (effective_acc == "ponytail" or outfit in ("feminine_silhouette", "skirt_dress") or char_index == 1)
         self.draw_expression(
             draw, int(hx), int(hy), emotion, scale * (1.06 if hr > 20 * scale else 1.0),
             fg_override=face_fg, head_fill=head_fill,
             blinking=is_blinking, mouth_open=mouth_open,
             mouth_wide=(talk_phase == 2), facing=facing,
-            cheek_blush=bool(p.get("cheek_blush", False)),
+            cheek_blush=bool(p.get("cheek_blush", False) or is_female_char),
             has_glasses=(outfit == "presenter_suit" or effective_acc in ("glasses_bowtie", "glasses")),
             has_mustache=(outfit == "historical_coat" and char_index == 1),
             has_sclera=use_sclera,
             has_nose=is_chunky_caveman,
+            has_eyelashes=is_female_char,
             time_sec=time_sec,
             gaze_target=gaze_target,
         )
@@ -1335,6 +1428,18 @@ class StickmanRenderer:
             sl_r = 5.5 * scale
             for sx, sy in (ls, rs):
                 draw.ellipse([sx - sl_r, sy - sl_r * 0.8, sx + sl_r, sy + sl_r * 1.15], fill=tee_col, outline=fg, width=max(1, lw // 2))
+        elif outfit in ("feminine_silhouette", "skirt_dress"):
+            # Flared feminine dress/skirt silhouette
+            dress_col = acc or "#F43F5E"
+            skirt_pts = [
+                (sh_left_x - 1 * scale, top_y),
+                (sh_right_x + 1 * scale, top_y),
+                (hp[0] + sh_w * 1.18, bot_y + 8 * scale),
+                (hp[0] - sh_w * 1.18, bot_y + 8 * scale),
+            ]
+            draw.polygon(skirt_pts, fill=dress_col, outline=fg, width=max(2, lw - 1))
+            # Elegant curved waist contour
+            draw.line([(mid_x - sh_w * 0.55, (top_y + bot_y) * 0.55), (mid_x + sh_w * 0.55, (top_y + bot_y) * 0.55)], fill=fg, width=max(1, lw // 2))
         elif outfit == "hide_tunic":
             # Prehistoric jagged one-shoulder animal-hide tunic + spotted fur edge
             hide_col = "#C2611A" if char_index == 0 else "#9A4814"
@@ -1506,7 +1611,27 @@ class StickmanRenderer:
         char_index: int,
     ) -> None:
         """Draw headwear, scarves, caveman hair + bone, samurai topknot, top hats, beanies."""
-        if outfit == "beanie_tee" or accessory == "red_beanie":
+        if accessory == "ponytail" or outfit in ("feminine_silhouette", "skirt_dress"):
+            # Signature feminine sleek ponytail + ribbon (Maya/Female stickman)
+            ribbon_col = acc or "#F43F5E"
+            hair_c = fg or "#18181B"
+            tie_x = hx - dir_sign * hr * 0.70
+            tie_y = hy - hr * 0.35
+            # Ribbon tie
+            draw.ellipse([tie_x - 3.5 * scale, tie_y - 3.5 * scale, tie_x + 3.5 * scale, tie_y + 3.5 * scale], fill=ribbon_col, outline=fg, width=max(1, lw // 3))
+            # Elegant flowing ponytail curves swooping backwards
+            pts = [
+                (tie_x, tie_y),
+                (tie_x - dir_sign * 14 * scale, tie_y + 4 * scale),
+                (tie_x - dir_sign * 24 * scale, tie_y + 22 * scale),
+                (tie_x - dir_sign * 20 * scale, tie_y + 36 * scale),
+                (tie_x - dir_sign * 12 * scale, tie_y + 24 * scale),
+                (tie_x, tie_y + 4 * scale),
+            ]
+            draw.polygon(pts, fill=hair_c, outline=fg, width=max(1, lw // 2))
+            # Soft side bangs
+            draw.arc([hx - hr * 0.8, hy - hr * 0.9, hx + hr * 0.8, hy - hr * 0.1], start=190, end=340, fill=hair_c, width=max(1, int(2.2 * scale)))
+        elif outfit == "beanie_tee" or accessory == "red_beanie":
             beanie_col = "#EF4444" if char_index == 0 else "#3B82F6"
             top_y = hy - hr - 7 * scale
             brim_y = hy - hr * 0.44
@@ -1647,6 +1772,7 @@ class StickmanRenderer:
         has_mustache: bool = False,
         has_sclera: bool = False,
         has_nose: bool = False,
+        has_eyelashes: bool = False,
         time_sec: float = 0.0,
         gaze_target: Optional[tuple[float, float]] = None,
     ) -> None:
@@ -1726,6 +1852,15 @@ class StickmanRenderer:
 
         if has_glasses:
             draw.line([(cx - eo + er * 1.7 + shift_x, cy - ey), (cx + eo - er * 1.7 + shift_x, cy - ey)], fill=fg, width=max(1, ew))
+
+        # Cartoon curved eyelashes for female stickman
+        if has_eyelashes:
+            for ex in (-eo, eo):
+                ex_pos = cx + ex + shift_x
+                ey_pos = cy - ey - er * 0.7
+                lash_dir = 1 if ex > 0 else -1
+                draw.line([(ex_pos + lash_dir * er * 0.8, ey_pos + er * 0.2), (ex_pos + lash_dir * er * 1.6, ey_pos - er * 0.6)], fill=fg, width=max(1, int(1.8 * scale)))
+                draw.line([(ex_pos + lash_dir * er * 0.5, ey_pos - er * 0.1), (ex_pos + lash_dir * er * 1.2, ey_pos - er * 1.0)], fill=fg, width=max(1, int(1.5 * scale)))
 
         # Optional cartoon bulbous nose (chunky caveman)
         if has_nose:

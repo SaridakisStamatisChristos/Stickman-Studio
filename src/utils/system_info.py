@@ -202,6 +202,8 @@ def get_system_summary() -> dict:
         "available_ram_mb":  avail_ram,
         "total_vram_mb":     total_vram,
         "free_vram_mb":      free_vram,
+        "has_gpu":           total_vram > 0,
+        "nvenc_ready":       total_vram > 0,
         "recommended_model": recommend_model_for_system(
             available_ram_mb=avail_ram,
             free_vram_mb=free_vram,

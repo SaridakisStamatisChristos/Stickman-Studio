@@ -229,16 +229,48 @@ class ProgressDialog(QDialog):
     # Public API
     # ------------------------------------------------------------------
 
+    def _normalize_stage(self, stage_name: str) -> str:
+        s = stage_name.strip()
+        if s in STAGES:
+            return s
+        low = s.lower().rstrip("….").strip()
+        if any(k in low for k in ("understanding", "script")):
+            return "Understanding script"
+        if any(k in low for k in ("plan", "storyboard")):
+            return "Planning scenes"
+        if any(k in low for k in ("synthesiz", "voice", "narration")):
+            return "Generating narration"
+        if any(k in low for k in ("mix", "score", "ambient", "sfx")):
+            return "Mixing audio"
+        if any(k in low for k in ("art", "illustrat", "animat", "sprite", "scene")):
+            return "Creating animations"
+        if any(k in low for k in ("caption", "subtitle", "manifest")):
+            return "Adding captions"
+        if any(k in low for k in ("render", "encod", "autopilot", "ffmpeg", "preview sample", "cinematic video")):
+            return "Rendering video"
+        if any(k in low for k in ("validat", "qc", "check", "inspect")):
+            return "Validating output"
+        if any(k in low for k in ("complete", "done", "finish")):
+            return "Complete"
+        return s
+
     def update_stage(self, stage_name: str, percentage: int) -> None:
         """Move progress to stage_name at the given percentage."""
+        canonical = self._normalize_stage(stage_name)
         self._stage_name_lbl.setText(stage_name)
         self._progress_bar.setValue(max(0, min(100, percentage)))
 
-        for name, row in self._stage_rows.items():
-            if name == stage_name:
+        target_idx = STAGES.index(canonical) if canonical in STAGES else -1
+        if target_idx != -1:
+            self._current_stage_index = target_idx
+
+        for idx, name in enumerate(STAGES):
+            row = self._stage_rows.get(name)
+            if not row:
+                continue
+            if idx == self._current_stage_index:
                 row.set_state("active")
-                self._current_stage_index = STAGES.index(name) if name in STAGES else -1
-            elif name in STAGES and STAGES.index(name) < self._current_stage_index:
+            elif idx < self._current_stage_index:
                 row.set_state("done")
             else:
                 row.set_state("pending")

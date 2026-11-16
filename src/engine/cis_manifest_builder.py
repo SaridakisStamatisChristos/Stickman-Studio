@@ -61,13 +61,24 @@ def _build_captions(
         narration = " ".join(str(sc.get("narration", "")).split())
         if not narration:
             continue
+        # Ensure no speaker prefixes or markdown asterisks leak into captions
+        import re as _re
+        narration = _re.sub(
+            r"^\s*(?:\*\*)?(?:\[)?(?:alex|maya|speaker\s*1|speaker\s*2|voice\s*1|voice\s*2|male\s*voice|female\s*voice|male|female)(?:\])?(?:\*\*)?\s*[:\-–—]\s*",
+            "",
+            narration,
+            flags=_re.IGNORECASE,
+        ).strip()
+        narration = _re.sub(r"[*_]+", "", narration).strip()
+        if not narration:
+            continue
         words = narration.split()
         chunks: list[str] = []
         cur: list[str] = []
         for w in words:
             cur.append(w)
             joined = " ".join(cur)
-            if len(cur) >= 5 or len(joined) > 32 or w.endswith((".", "!", "?", ",", ";", ":")):
+            if len(cur) >= 4 or len(joined) > 26 or w.endswith((".", "!", "?", ",", ";", ":")):
                 chunks.append(joined)
                 cur = []
         if cur:
@@ -75,11 +86,16 @@ def _build_captions(
         if not chunks:
             chunks = [narration]
 
+        # Spoken window for caption display (clears during breathing silence gap)
+        a_dur = float(sc.get("_audio_duration", 0.0))
+        spoken_span = a_dur if (a_dur > 0 and a_dur <= dur) else max(0.1, dur - float(sc.get("_silence_gap", 0.12)))
+
         c_weights = [_word_count(c) for c in chunks]
         total_cw = sum(c_weights) or 1
-        t_cursor = max(last_end, start)
+        t_cursor = max(last_end, round(start + 0.030, 3))
+        cap_avail = max(0.2, spoken_span - 0.040)
         for c_text, cw in zip(chunks, c_weights):
-            c_dur = dur * (cw / total_cw)
+            c_dur = cap_avail * (cw / total_cw)
             c_start = round(min(max_safe_end - 0.05, t_cursor), 3)
             c_end = round(min(max_safe_end, c_start + c_dur), 3)
             if c_end <= c_start:
@@ -219,6 +235,58 @@ def generate_bg_paper(
         return True
     except Exception as exc:
         logger.warning("Could not generate background texture: %s", exc)
+        return False
+
+
+def generate_shot_procedural_background(
+    output_path: str,
+    scene: dict,
+    scene_idx: int,
+    width: int = 1080,
+    height: int = 1920,
+    tint_hex: str = "#FAF8F3",
+    is_dark: bool = False,
+    draw_grid: bool = False,
+    style: str = "B1",
+    accent: str = "#38BDF8",
+) -> bool:
+    """Generate an individual, topic-tailored procedural vector background for this shot."""
+    p = Path(output_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    # 1. Base paper / obsidian texture
+    generate_bg_paper(output_path, width=width, height=height, tint_hex=tint_hex, is_dark=is_dark, draw_grid=draw_grid)
+
+    # 2. Paint procedural environment on top
+    try:
+        from engine.ai_background_engine import AIBackgroundEngine
+        im = Image.open(output_path).convert("RGBA")
+        d = ImageDraw.Draw(im)
+        floor_y = int(height * 0.74)
+        narr = f"{scene.get('narration', '')} {scene.get('scene_title', '')}".strip()
+
+        style_params = {
+            "fg": "#E2E8F0" if is_dark else "#334155",
+            "bg": tint_hex,
+            "accent": accent,
+            "accent_secondary": "#F43F5E" if is_dark else "#0284C7",
+            "line_width": max(2, int(width / 360)),
+            "is_dark": is_dark,
+        }
+        sid = "b3_dark" if is_dark else "b1_light"
+        AIBackgroundEngine.render_ai_background(
+            draw=d,
+            narration=narr,
+            scene_idx=scene_idx,
+            w=width,
+            h=height,
+            floor_y=floor_y,
+            style_params=style_params,
+            style_id=sid,
+        )
+        im.convert("RGB").save(output_path, "PNG")
+        return True
+    except Exception as exc:
+        logger.warning("Could not render procedural shot background for scene %d: %s", scene_idx, exc)
         return False
 
 
@@ -901,46 +969,74 @@ def build_manifest(
     bg_paper_rel = "assets/scenes/bg_paper.png"
     bg_cache: dict[tuple[str, bool, bool], str] = {(tint_hex, is_dark, draw_grid0): bg_paper_rel}
 
-    durations = _distribute_durations(scenes, narration_duration)
-    scene_starts: list[float] = []
-    t = 0.0
-    for d in durations:
-        scene_starts.append(round(t, 3))
-        t += d
+    has_audio_timings = bool(scenes) and all(sc.get("_audio_start") is not None for sc in scenes)
+    if has_audio_timings:
+        scene_starts = [round(float(sc["_audio_start"]), 3) for sc in scenes]
+        if scene_starts:
+            scene_starts[0] = 0.0  # Autopilot engine strictly requires Shot 0 to begin at 0.0
+        durations = []
+        for i, sc in enumerate(scenes):
+            cur_s = scene_starts[i]
+            if i + 1 < len(scenes):
+                next_s = round(float(scenes[i + 1]["_audio_start"]), 3)
+                if next_s <= cur_s:
+                    next_s = round(cur_s + max(0.5, float(sc.get("duration", 1.5))), 3)
+                d = max(0.4, next_s - cur_s)
+            else:
+                d = max(0.5, narration_duration - cur_s)
+            durations.append(round(d, 3))
+    else:
+        durations = _distribute_durations(scenes, narration_duration)
+        scene_starts = []
+        t = 0.0
+        for d in durations:
+            scene_starts.append(round(t, 3))
+            t += d
 
     shots: list[dict] = []
-    for i, (sc, png, start, dur) in enumerate(zip(scenes, scene_png_paths, scene_starts, durations)):
+    current_shot_start = 0.0
+    for i, (sc, png, _, dur) in enumerate(zip(scenes, scene_png_paths, scene_starts, durations)):
+        shot_start = round(current_shot_start, 3)
         if i == len(scenes) - 1:
             end = round(narration_duration, 3)
-            dur = end - start
+            dur = max(0.5, end - shot_start)
         else:
-            end = round(start + dur, 3)
+            end = round(shot_start + dur, 3)
+        current_shot_start = end
 
         sc_th = sc.get("theme") or {}
         sc_dark = bool(sc_th.get("is_dark", is_dark))
         sc_tint = str(sc.get("bg_wash_tint") or sc_th.get("paper_bg") or tint_hex)
         sc_grid = (style == "B1") or ("grid" in str(sc_th.get("bg_mode", "")))
-        bg_key = (sc_tint, sc_dark, sc_grid)
-        if bg_key not in bg_cache:
-            shot_bg_name = f"bg_shot_{i + 1:02d}.png"
-            shot_bg_path = scenes_dir / shot_bg_name
-            generate_bg_paper(
-                str(shot_bg_path), width=width, height=height,
-                tint_hex=sc_tint, is_dark=sc_dark, draw_grid=sc_grid,
-            )
-            bg_cache[bg_key] = f"assets/scenes/{shot_bg_name}"
+        sc_accent = str(sc.get("accent_color") or "#38BDF8")
+
+        shot_bg_name = f"bg_shot_{i + 1:02d}.png"
+        shot_bg_path = scenes_dir / shot_bg_name
+        generate_shot_procedural_background(
+            output_path=str(shot_bg_path),
+            scene=sc,
+            scene_idx=i,
+            width=width,
+            height=height,
+            tint_hex=sc_tint,
+            is_dark=sc_dark,
+            draw_grid=sc_grid,
+            style=style,
+            accent=sc_accent,
+        )
+        shot_bg_rel = f"assets/scenes/{shot_bg_name}"
 
         layers = _build_shot_layers(
             sc=sc,
             fallback_png=png,
-            bg_paper_rel=bg_cache[bg_key],
+            bg_paper_rel=shot_bg_rel,
             out_dir=out_dir,
             dur=dur,
             plane_w=plane_w,
             plane_h=plane_h,
             style=style,
         )
-        shots.append({"start": round(start, 3), "end": end, "layers": layers})
+        shots.append({"start": round(shot_start, 3), "end": end, "layers": layers})
 
     captions = _build_captions(scenes, scene_starts, durations, narration_duration)
     sfx = _build_sfx(scene_starts, narration_duration)

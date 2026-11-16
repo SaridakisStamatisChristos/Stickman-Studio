@@ -30,11 +30,14 @@ FFMPEG_DIR = r"C:\ffmpeg\bin"
 
 
 def _get_env_with_ffmpeg() -> dict[str, str]:
-    """Ensure ffmpeg/ffprobe from C:/ffmpeg/bin is in PATH for Node and subprocesses."""
+    """Ensure ffmpeg/ffprobe from C:/ffmpeg/bin is in PATH for Node and subprocesses with GPU NVENC enabled."""
     env = os.environ.copy()
     current_path = env.get("PATH", "")
     if FFMPEG_DIR.lower() not in current_path.lower():
         env["PATH"] = f"{FFMPEG_DIR};{current_path}"
+    env["FFMPEG"] = os.path.join(FFMPEG_DIR, "ffmpeg.exe") if os.path.exists(os.path.join(FFMPEG_DIR, "ffmpeg.exe")) else "ffmpeg"
+    env["FFPROBE"] = os.path.join(FFMPEG_DIR, "ffprobe.exe") if os.path.exists(os.path.join(FFMPEG_DIR, "ffprobe.exe")) else "ffprobe"
+    env["USE_NVENC"] = "1"
     return env
 
 
@@ -203,7 +206,7 @@ class CISPipeline:
         # ------------------------------------------------------------------
         if not script or script_mode == "auto_generate":
             _log(log_callback, f"Auto-generating narration script for topic: '{topic}'…")
-            _notify_progress(progress_callback, "Generating narration script…", 3)
+            _notify_progress(progress_callback, "Understanding script", 3)
             try:
                 from engine.scene_planner import ScenePlanner
                 sp = ScenePlanner(llm_manager=self.llm_manager)
@@ -221,6 +224,7 @@ class CISPipeline:
             _log(log_callback, f"Script ready: {len(script.split())} words.")
         elif script_mode == "improve":
             _log(log_callback, "Polishing narration script…")
+            _notify_progress(progress_callback, "Understanding script", 4)
             try:
                 from engine.scene_planner import ScenePlanner
                 sp = ScenePlanner(llm_manager=self.llm_manager)
@@ -229,7 +233,7 @@ class CISPipeline:
                 _log(log_callback, f"Script improve note: {exc}")
             self.last_script_used = script
 
-        _notify_progress(progress_callback, "Planning visual storyboard…", 6)
+        _notify_progress(progress_callback, "Planning scenes", 10)
         if self._cancelled():
             return None
 
@@ -258,7 +262,7 @@ class CISPipeline:
         for sc in storyboard:
             _log(log_callback, f"  Scene {sc['scene_id']}: [{sc.get('choreography')}/{sc.get('layout_mode')}] {sc['scene_title']} — {sc['scene_subtitle']}")
 
-        _notify_progress(progress_callback, "Generating illustrated scene art…", 15)
+        _notify_progress(progress_callback, "Creating animations", 15)
         if self._cancelled():
             return None
 
@@ -286,7 +290,7 @@ class CISPipeline:
                 illustrator.illustrate(sc, out_png)
                 scene_png_paths.append(out_png)
                 pct = 15 + int(35 * (i + 1) / total_scenes)
-                _notify_progress(progress_callback, f"Rendering illustration {i+1}/{total_scenes}…", pct)
+                _notify_progress(progress_callback, "Creating animations", pct)
         finally:
             if illus_mode == "lcm":
                 try:
@@ -295,16 +299,25 @@ class CISPipeline:
                 except Exception:
                     pass
 
-        _notify_progress(progress_callback, "Synthesizing voice narration…", 52)
+        _notify_progress(progress_callback, "Generating narration", 52)
         if self._cancelled():
             return None
 
         # ------------------------------------------------------------------
-        # 3. TTS Voice Synthesis (with Smart Auto Voice Speed Pacing)
+        # 3. TTS Voice Synthesis (with 0ms Audio-Visual Drift Lockstep)
         # ------------------------------------------------------------------
+        from engine.timeline_manager import CentralTimelineManager
+        from audio.mixer import AudioMixer
+
+        ffmpeg_bin = shutil.which("ffmpeg") or str(Path(FFMPEG_DIR) / "ffmpeg.exe")
+        audio_mixer = AudioMixer(ffmpeg_path=ffmpeg_bin)
+        timeline_mgr = CentralTimelineManager(fps=30)
+        timeline_mgr.register_scenes(storyboard)
+
         full_narration = " ".join(sc.get("narration", "") for sc in storyboard).strip()
         narration_wav = str(job_dir / "narration.wav")
-        tts_ok = False
+        tts_scenes_dir = job_dir / "tts_scenes"
+        tts_scenes_dir.mkdir(parents=True, exist_ok=True)
         video_profile = str(storyboard[0].get("video_profile", "balanced")) if storyboard else "balanced"
 
         effective_speed = voice_speed
@@ -320,43 +333,112 @@ class CISPipeline:
             except Exception as exc:
                 _log(log_callback, f"Auto speed note: {exc}")
 
-        if self.tts_manager:
+        is_dialogue = bool(params.get("dialogue_mode", False)) or any(sc.get("speaker") == 2 for sc in storyboard)
+        s1_cfg = dict(params.get("speaker1", {}))
+        s2_cfg = dict(params.get("speaker2", {}))
+        s1_cfg["speed"] = float(s1_cfg.get("speed") or voice_speed or 1.0)
+        s2_cfg["speed"] = float(s2_cfg.get("speed") or voice_speed or 1.0)
+        n1 = s1_cfg.get("name", "Alex")
+        n2 = s2_cfg.get("name", "Maya")
+        master_audio = bool(params.get("acoustic_mastering", True))
+
+        total_scenes_count = len(storyboard)
+        _log(log_callback, f"Synthesizing voice narration beat-by-beat for {total_scenes_count} scenes (Dialogue={is_dialogue})…")
+
+        for b_idx, sc in enumerate(storyboard):
+            if self._cancelled():
+                return None
+
+            raw_text = sc.get("narration", "").strip()
+            # Clean out any speaker prefixes or markdown asterisks
+            clean_text = re.sub(
+                r"^\s*(?:\*\*)?(?:\[)?(?:alex|maya|speaker\s*1|speaker\s*2|voice\s*1|voice\s*2|male\s*voice|female\s*voice|male|female)(?:\])?(?:\s*\([^)]*\))?(?:\*\*)?\s*[:\-–—]\s*",
+                "",
+                raw_text,
+                flags=re.IGNORECASE,
+            ).strip()
+            clean_text = re.sub(r"[*_]+", "", clean_text).strip()
+
+            spk = sc.get("speaker", 1)
+            spk_name = str(sc.get("speaker_name", n1 if spk == 1 else n2))
+
+            if is_dialogue and (spk == 2 or spk_name.lower() in ("maya", "female")):
+                eff_voice = s2_cfg.get("voice_id") or "blend:female_warm"
+                eff_spd = float(s2_cfg.get("speed") or effective_speed or 1.0)
+                eff_pitch = float(s2_cfg.get("pitch", 0.0))
+            elif is_dialogue:
+                eff_voice = s1_cfg.get("voice_id") or "blend:male_introspective"
+                eff_spd = float(s1_cfg.get("speed") or effective_speed or 1.0)
+                eff_pitch = float(s1_cfg.get("pitch", 0.0))
+            else:
+                eff_voice = voice_id or "af_heart"
+                eff_spd = effective_speed
+                eff_pitch = float(params.get("voice_pitch", 0.0))
+
+            scene_wav = str(tts_scenes_dir / f"scene_{b_idx:03d}.wav")
+            synth_ok = False
+            a_dur = 0.0
+
+            if clean_text and self.tts_manager:
+                try:
+                    synth_path = self.tts_manager.synthesize(
+                        text=clean_text,
+                        voice_id=eff_voice,
+                        speed=eff_spd,
+                        pitch=eff_pitch,
+                        output_path=scene_wav,
+                    )
+                    if synth_path and os.path.exists(synth_path):
+                        synth_ok = True
+                        if hasattr(self.tts_manager, "trim_silence"):
+                            self.tts_manager.trim_silence(synth_path, synth_path, head_pad=0.030, tail_pad=0.060)
+                        a_dur = _get_audio_duration(synth_path)
+                except Exception as exc:
+                    _log(log_callback, f"Scene {b_idx+1} TTS note: {exc}")
+
+            if not synth_ok:
+                a_dur = self.tts_manager.estimate_duration(clean_text, eff_spd) if (clean_text and self.tts_manager) else 0.0
+
+            timeline_mgr.record_audio(
+                b_idx,
+                scene_wav if synth_ok else None,
+                a_dur,
+                clean_text=clean_text or raw_text,
+            )
+
+            pct = 52 + int(8 * (b_idx + 1) / total_scenes_count)
+            _notify_progress(progress_callback, "Generating narration", pct)
+
+        # Authoritative Central Timeline Calculation (0ms drift, comfortable 2.2s minimum scene hold)
+        total_timeline_dur = timeline_mgr.compute_timeline(default_gap=0.12, min_scene_duration=2.2)
+
+        # Assemble Master Narration Track (lockstep beat-for-beat with breathing micro-gaps)
+        track_built = timeline_mgr.build_synchronized_audio_track(
+            output_path=narration_wav,
+            audio_mixer=audio_mixer,
+            temp_dir=job_dir / "silence",
+        )
+
+        if not track_built or not Path(narration_wav).exists():
+            _log(log_callback, "Warning: Synchronized audio track build fallback; creating silent track.")
+            _write_silent_wav(narration_wav, max(2.0, total_timeline_dur))
+
+        if master_audio and Path(narration_wav).exists() and self.tts_manager and hasattr(self.tts_manager, "apply_acoustic_mastering"):
             try:
-                _log(log_callback, f"Synthesizing voice '{voice_id}' at speed {effective_speed:.2f}x…")
-                tts_ok = self.tts_manager.synthesize(
-                    text=full_narration,
-                    output_path=narration_wav,
-                    voice_id=voice_id,
-                    speed=effective_speed,
-                )
+                self.tts_manager.apply_acoustic_mastering(narration_wav, narration_wav)
             except Exception as exc:
-                _log(log_callback, f"TTS synthesis exception: {exc}")
-
-        if tts_ok and Path(narration_wav).exists() and auto_voice_speed and duration >= 10:
-            measured = _get_audio_duration(narration_wav)
-            if abs(measured - duration) / max(1.0, float(duration)) > 0.16:
-                refined = round(max(0.88, min(1.22, effective_speed * (measured / float(duration)))), 2)
-                if abs(refined - effective_speed) >= 0.05:
-                    _log(log_callback, f"Refining Auto Voice Speed: {effective_speed:.2f}x -> {refined:.2f}x (measured {measured:.1f}s vs target {duration}s)…")
-                    try:
-                        if self.tts_manager.synthesize(
-                            text=full_narration,
-                            output_path=narration_wav,
-                            voice_id=voice_id,
-                            speed=refined,
-                        ):
-                            effective_speed = refined
-                    except Exception:
-                        pass
-
-        if not tts_ok or not Path(narration_wav).exists():
-            _log(log_callback, "Warning: TTS voice unavailable; writing silent audio track.")
-            _write_silent_wav(narration_wav, float(duration))
+                _log(log_callback, f"Acoustic mastering note: {exc}")
 
         narration_duration = _get_audio_duration(narration_wav)
-        _log(log_callback, f"Audio ready: duration = {narration_duration:.2f}s (speed {effective_speed:.2f}x)")
+        # Ensure the final scene's end aligns exactly with narration_wav duration
+        if storyboard and narration_duration > 0:
+            last_start = float(storyboard[-1].get("_audio_start", 0.0))
+            storyboard[-1]["duration"] = max(0.5, round(narration_duration - last_start, 3))
+            storyboard[-1]["_scene_end_time"] = round(narration_duration, 3)
 
-        _notify_progress(progress_callback, "Building video manifest & timing…", 60)
+        _log(log_callback, f"Audio track ready: {narration_duration:.2f}s locked across {len(storyboard)} scenes (0ms drift).")
+
+        _notify_progress(progress_callback, "Adding captions", 65)
         if self._cancelled():
             return None
 
@@ -386,7 +468,7 @@ class CISPipeline:
         )
         _log(log_callback, f"Manifest written to {manifest_path}")
 
-        _notify_progress(progress_callback, "Rendering cinematic video…", 70)
+        _notify_progress(progress_callback, "Rendering video", 72)
         if self._cancelled():
             return None
 
@@ -405,14 +487,21 @@ class CISPipeline:
         if not output_mp4 or not Path(output_mp4).exists():
             _log(log_callback, "Using native direct FFmpeg compositing fallback…")
             output_mp4 = self._render_ffmpeg_fallback(
-                storyboard, scene_png_paths, narration_wav, narration_duration, job_dir, log_callback
+                storyboard=storyboard,
+                scene_png_paths=scene_png_paths,
+                narration_wav=narration_wav,
+                duration=narration_duration,
+                job_dir=job_dir,
+                log_callback=log_callback,
+                manifest_path=manifest_path,
+                aspect_ratio=fmt,
             )
 
         if output_mp4 and Path(output_mp4).exists():
             elapsed = round(time.time() - t_start, 1)
             file_size_mb = round(Path(output_mp4).stat().st_size / (1024 * 1024), 2)
             _log(log_callback, f"✓ Cinematic Illustrated video created successfully in {elapsed}s: {output_mp4} ({file_size_mb} MB)")
-            _notify_progress(progress_callback, "Complete!", 100)
+            _notify_progress(progress_callback, "Complete", 100)
             return output_mp4
 
         _log(log_callback, "Error: Final video file could not be produced.")
@@ -434,7 +523,7 @@ class CISPipeline:
         try:
             # Phase 1: Preview (20s)
             _log(log_callback, "Autopilot Phase 1: Generating preview…")
-            _notify_progress(progress_callback, "Rendering preview sample…", 75)
+            _notify_progress(progress_callback, "Rendering video", 78)
             p1 = subprocess.run(
                 ["node", str(AUTOPILOT_SCRIPT), "preview", manifest_abs, "--seconds", "20"],
                 capture_output=True,
@@ -468,7 +557,7 @@ class CISPipeline:
 
             # Phase 3: Full Film Render
             _log(log_callback, "Autopilot Phase 3: Rendering full cinematic film…")
-            _notify_progress(progress_callback, "Encoding full video with subtitles & Ken Burns…", 88)
+            _notify_progress(progress_callback, "Rendering video", 88)
             p3 = subprocess.run(
                 ["node", str(AUTOPILOT_SCRIPT), "render", manifest_abs],
                 capture_output=True,
@@ -485,9 +574,12 @@ class CISPipeline:
             if film_mp4.exists():
                 return str(film_mp4)
 
-            if preview_mp4.exists():
-                _log(log_callback, "Full film not found, returning preview video.")
+            if preview_mode and preview_mp4.exists():
+                _log(log_callback, "Fast preview rendered successfully.")
                 return str(preview_mp4)
+
+            _log(log_callback, "Autopilot full film not generated, falling back to direct compositing…")
+            return None
 
         except Exception as exc:
             _log(log_callback, f"Autopilot execution exception: {exc}")
@@ -502,23 +594,58 @@ class CISPipeline:
         duration: float,
         job_dir: Path,
         log_callback: Optional[Callable],
+        manifest_path: Optional[str] = None,
+        aspect_ratio: str = "9:16",
     ) -> Optional[str]:
-        """Direct fallback: streams frames through FFmpeg stdin pipe with Ken Burns zoom."""
+        """Direct fallback: streams frames through FFmpeg with Ken Burns zoom and synchronized subtitles."""
         ffmpeg_bin = shutil.which("ffmpeg") or str(Path(FFMPEG_DIR) / "ffmpeg.exe")
         if not os.path.exists(ffmpeg_bin):
             return None
 
         out_mp4 = str(job_dir / "output_film.mp4")
         fps = 24
-        w, h = 1080, 1920
+        if aspect_ratio == "16:9":
+            w, h = 1920, 1080
+        elif aspect_ratio == "1:1":
+            w, h = 1080, 1080
+        else:
+            w, h = 1080, 1920
 
-        # Calculate frames per scene
-        total_w = sum(len(sc.get("narration", "").split()) for sc in storyboard) or 1
-        scene_durations = [
-            max(2.0, duration * len(sc.get("narration", "").split()) / total_w)
-            for sc in storyboard
-        ]
+        # Load exact scene durations and timed captions from manifest
+        captions: list[dict] = []
+        scene_durations: list[float] = []
+        if manifest_path and os.path.exists(manifest_path):
+            try:
+                import json
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    manifest_data = json.load(f)
+                captions = manifest_data.get("captions", [])
+                shots = manifest_data.get("shots", [])
+                if shots and len(shots) == len(storyboard):
+                    scene_durations = [round(max(0.5, float(sh.get("end", 0.0)) - float(sh.get("start", 0.0))), 3) for sh in shots]
+            except Exception as exc:
+                logger.warning("Could not read manifest in FFmpeg fallback: %s", exc)
 
+        if not scene_durations:
+            has_timings = bool(storyboard) and all(sc.get("_audio_duration") is not None for sc in storyboard)
+            if has_timings:
+                scene_durations = [max(1.0, float(sc.get("_audio_duration", 2.0)) + float(sc.get("_silence_gap", 0.12))) for sc in storyboard]
+            else:
+                total_w = sum(len(sc.get("narration", "").split()) for sc in storyboard) or 1
+                scene_durations = [
+                    max(2.0, duration * len(sc.get("narration", "").split()) / total_w)
+                    for sc in storyboard
+                ]
+
+        # Check NVENC GPU support
+        use_nvenc = False
+        try:
+            chk = subprocess.run([ffmpeg_bin, "-hide_banner", "-encoders"], capture_output=True, text=True, timeout=5)
+            use_nvenc = "h264_nvenc" in chk.stdout
+        except Exception:
+            pass
+
+        vcodec = "h264_nvenc" if use_nvenc else "libx264"
         cmd = [
             ffmpeg_bin, "-y",
             "-f", "rawvideo",
@@ -528,9 +655,9 @@ class CISPipeline:
             "-r", str(fps),
             "-i", "pipe:0",
             "-i", narration_wav,
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "22",
+            "-c:v", vcodec,
+            "-preset", "fast" if use_nvenc else "medium",
+            "-cq:v" if use_nvenc else "-crf", "22",
             "-c:a", "aac",
             "-b:a", "192k",
             "-shortest",
@@ -540,8 +667,22 @@ class CISPipeline:
 
         try:
             from PIL import Image
+            from captions.renderer import CaptionRenderer
+
+            caption_font_size = max(46, int(h * 0.027))
+            cap_renderer = CaptionRenderer(
+                width=w,
+                height=h,
+                style="bold_social",
+                font_size=caption_font_size,
+                position="bottom",
+                style_id="cis_illustrated",
+            )
+
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
             self._active_proc = proc
+            written_frames = 0
+            total_target_frames = max(1, int(round(duration * fps)))
 
             for i, (png, s_dur) in enumerate(zip(scene_png_paths, scene_durations)):
                 if self._cancelled():
@@ -554,19 +695,45 @@ class CISPipeline:
                     base_img = Image.alpha_composite(paper, fg).convert("RGB")
                 else:
                     base_img = Image.new("RGB", (w, h), "#FAF8F3")
-                frames_n = max(1, int(s_dur * fps))
 
-                # Subtle Ken Burns zoom
+                if i == len(scene_durations) - 1:
+                    frames_n = max(1, total_target_frames - written_frames)
+                else:
+                    frames_n = max(1, int(round(s_dur * fps)))
+
+                # Cinematic Ken Burns camera motion
                 zoom_in = (i % 2 == 0)
                 for f_idx in range(frames_n):
                     progress = f_idx / float(frames_n)
+                    current_time = written_frames / float(fps)
                     scale = 1.0 + (0.04 * progress if zoom_in else 0.04 * (1.0 - progress))
                     zw, zh = int(w * scale), int(h * scale)
                     scaled = base_img.resize((zw, zh), Image.Resampling.BILINEAR)
                     crop_x = (zw - w) // 2
                     crop_y = (zh - h) // 2
                     frame = scaled.crop((crop_x, crop_y, crop_x + w, crop_y + h))
+
+                    # Render synchronized high-contrast subtitle overlay
+                    if captions:
+                        for cue in captions:
+                            c_start = float(cue.get("start", 0.0))
+                            c_end = float(cue.get("end", 0.0))
+                            if c_start <= current_time <= c_end:
+                                frame = cap_renderer.render_caption(
+                                    frame,
+                                    {
+                                        "text": cue.get("text", ""),
+                                        "start": c_start,
+                                        "end": c_end,
+                                        "style": "bold_social",
+                                        "uppercase": True,
+                                    },
+                                    current_time,
+                                )
+                                break
+
                     proc.stdin.write(frame.tobytes())
+                    written_frames += 1
 
             proc.stdin.close()
             proc.wait(timeout=300)
