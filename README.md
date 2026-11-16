@@ -341,16 +341,19 @@ cd Stickman-Studio
 
 ### 2. One-Click Setup (Run Once with Internet)
 
-Run the automated installer script to configure local packages and binaries:
+Run the automated installer script to configure all packages, engines, and models:
 
 ```batch
 setup_windows.bat
 ```
 
-This configures:
-- Core Python packages (`PySide6`, `Pillow`, `numpy`, `soundfile`, `requests`)
-- Local FFmpeg video encoding binary
-- In-process scene planner & offline Kokoro ONNX neural TTS model
+What the automated installer configures:
+- **Python & Pip**: Detects Python 3.10+ (or auto-installs Python 3.11 via `winget` if Python is missing)
+- **Python Dependencies**: Installs and verifies `PySide6`, `Pillow`, `numpy`, `soundfile`, `requests`, `tqdm`, `kokoro-onnx`, `piper-tts`
+- **FFmpeg & FFprobe**: Locates local/system binaries or auto-downloads Gyan.dev essentials build into `./ffmpeg/` and permanently registers it in your Windows User `Path`
+- **Neural Voices (~115 MB)**: Automatically downloads and caches `kokoro-v1.0.int8.onnx` and `voices-v1.0.bin` (54 voices across 8 languages)
+- **Directories & Typography**: Initializes runtime folders and verifies bundled `Caveat.ttf` & `NotoSans.ttf` fonts
+- **Hardware Acceleration Probe**: Tests NVIDIA NVENC GPU acceleration (`h264_nvenc`) with automatic fallback to high-quality CPU encoding (`libx264`)
 
 > [!NOTE]
 > Once setup completes and local models (`Kokoro ONNX`, optional `LCM_Dreamshaper_v7`) are cached, you can disconnect from the internet completely — everything runs 100% offline.
@@ -445,7 +448,8 @@ Stickman-Studio/
 ├── README.md                          # Comprehensive project documentation
 ├── requirements.txt                   # Python dependencies
 ├── run.bat                            # One-click startup script
-└── setup_windows.bat                  # Automated Windows environment installer
+├── setup_windows.bat                  # Automated Windows environment installer launcher
+└── setup_windows.ps1                  # One-click PowerShell installation & dependency engine
 ```
 
 ---
