@@ -25,7 +25,11 @@ class AudioMixer:
         self.ffmpeg_path = ffmpeg_path
         # Derive ffprobe from ffmpeg path
         parent = os.path.dirname(ffmpeg_path)
-        self.ffprobe_path = os.path.join(parent, "ffprobe") if parent else "ffprobe"
+        if parent:
+            probe_candidate = os.path.join(parent, "ffprobe.exe" if os.name == "nt" else "ffprobe")
+            self.ffprobe_path = probe_candidate if os.path.exists(probe_candidate) else os.path.join(parent, "ffprobe")
+        else:
+            self.ffprobe_path = shutil.which("ffprobe") or "ffprobe"
 
     # ------------------------------------------------------------------
     # Public API

@@ -136,7 +136,6 @@ class TTSManager:
             repo_root / "assets" / "voices" / "kokoro",
             Path("assets/voices/kokoro"),
             Path("models/kokoro"),
-            Path(r"D:\StickMan video software\models\kokoro"),
         ]
         model_names = ("kokoro-v1.0.fp16.onnx", "kokoro-v1.0.int8.onnx", "kokoro-v1.0.onnx", "kokoro-v0_19.onnx")
         voice_names = ("voices-v1.0.bin", "voices.bin", "voices.json")

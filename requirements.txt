@@ -1,6 +1,6 @@
 # Stickman Studio — Python Dependencies
 # Install with: pip install -r requirements.txt
-# See setup_windows.bat for complete setup including FFmpeg
+# See setup_windows.bat for complete one-click setup including FFmpeg & AI models
 
 # ── Core UI ──────────────────────────────────────────────────────────────────
 PySide6>=6.6.0                    # Desktop GUI (Qt 6)
@@ -9,25 +9,22 @@ PySide6>=6.6.0                    # Desktop GUI (Qt 6)
 Pillow>=10.0.0                    # Image rendering for animation frames
 
 # ── HTTP Client ──────────────────────────────────────────────────────────────
-requests>=2.31.0                  # Ollama REST API calls
+requests>=2.31.0                  # Local LLM / REST API calls
 
-# ── Numerical Computing ──────────────────────────────────────────────────────
-numpy>=1.24.0                     # Audio synthesis, signal processing
+# ── Numerical Computing & Signal Processing ──────────────────────────────────
+numpy>=1.24.0                     # Audio synthesis, procedural kinematics, DSP
 
 # ── Progress Reporting ───────────────────────────────────────────────────────
-tqdm>=4.65.0                      # CLI progress bars for setup/batch ops
+tqdm>=4.65.0                      # CLI progress reporting
 
-# ── TTS Engines (install at least one) ───────────────────────────────────────
-# kokoro-onnx>=0.3.0              # Kokoro-82M TTS (run: pip install kokoro-onnx)
-# piper-tts>=1.2.0                # Piper TTS (run: pip install piper-tts)
-
-# ── Audio Processing ─────────────────────────────────────────────────────────
-# soundfile>=0.12.0               # Read/write audio (optional, for TTS output)
-# sounddevice>=0.4.6              # Voice preview playback (optional)
+# ── Audio Processing & Neural TTS ───────────────────────────────────────────
+soundfile>=0.12.0                 # High-fidelity audio read/write (WAV generation)
+onnxruntime>=1.16.0               # High-performance neural inference runtime
+kokoro-onnx>=0.3.0                # Kokoro-82M offline neural voice engine
+piper-tts>=1.2.0                  # Piper offline neural voice fallback engine
 
 # ── Notes ────────────────────────────────────────────────────────────────────
-# External tools (not Python packages) also required:
-#   - FFmpeg: downloaded by setup_windows.bat
-#   - Ollama: downloaded by setup_windows.bat
-# See README.md for full installation instructions.
-
+# External tools & neural weights configured automatically by setup_windows.bat:
+#   - FFmpeg & FFprobe (in ./ffmpeg or system PATH)
+#   - Kokoro-82M neural model weights (kokoro-v1.0.int8.onnx & voices-v1.0.bin)
+# See README.md for full installation details.

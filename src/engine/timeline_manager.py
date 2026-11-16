@@ -353,8 +353,14 @@ class CentralTimelineManager:
             return False, f"File not found: {video_path}", {}
 
         # Run ffprobe to get exact stream durations
+        repo_ffprobe = Path(__file__).resolve().parent.parent.parent / "ffmpeg" / "ffprobe.exe"
+        ffprobe_bin = (
+            shutil.which("ffprobe")
+            or (str(repo_ffprobe) if repo_ffprobe.exists() else None)
+            or (r"C:\ffmpeg\bin\ffprobe.exe" if os.path.exists(r"C:\ffmpeg\bin\ffprobe.exe") else "ffprobe")
+        )
         cmd = [
-            "C:\\ffmpeg\\bin\\ffprobe.exe",
+            ffprobe_bin,
             "-v", "quiet",
             "-print_format", "json",
             "-show_format",

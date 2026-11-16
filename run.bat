@@ -1,5 +1,6 @@
 @echo off
-title Stickman Studio • Created by Atharv Hatwar
+chcp 65001 >nul
+title Stickman Studio - Created by Atharv Hatwar
 color 0A
 cd /d "%~dp0"
 
@@ -7,12 +8,15 @@ echo ========================================================
 echo         Stickman Studio - Created by Atharv Hatwar
 echo ========================================================
 
-:: Add local ffmpeg or C:\ffmpeg\bin to PATH if present
+:: Add local ffmpeg or C:\ffmpeg\bin to PATH
 if exist "%~dp0ffmpeg\ffmpeg.exe" (
     set "PATH=%~dp0ffmpeg;%PATH%"
 ) else if exist "C:\ffmpeg\bin\ffmpeg.exe" (
     set "PATH=C:\ffmpeg\bin;%PATH%"
 )
+
+:: Set Python module search path
+set "PYTHONPATH=%~dp0src;%PYTHONPATH%"
 
 :: Locate Python interpreter
 set "PY_CMD="
@@ -28,10 +32,20 @@ if not defined PY_CMD (
 if not defined PY_CMD if exist "C:\Python314\python.exe" (
     set "PY_CMD=C:\Python314\python.exe"
 )
+if not defined PY_CMD if exist "C:\Python313\python.exe" (
+    set "PY_CMD=C:\Python313\python.exe"
+)
+if not defined PY_CMD if exist "C:\Python312\python.exe" (
+    set "PY_CMD=C:\Python312\python.exe"
+)
+if not defined PY_CMD if exist "C:\Python311\python.exe" (
+    set "PY_CMD=C:\Python311\python.exe"
+)
 
 if not defined PY_CMD (
-    echo ERROR: Python 3.11+ was not found on PATH.
+    echo ERROR: Python 3.10+ was not found on PATH.
     echo Please install Python from https://www.python.org/
+    echo Or run setup_windows.bat to auto-configure.
     pause
     exit /b 1
 )

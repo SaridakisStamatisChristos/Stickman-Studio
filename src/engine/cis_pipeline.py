@@ -24,19 +24,50 @@ from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-AUTOPILOT_DIR = Path(r"C:\Users\athar\.gemini\config\skills\directing-stickman-videos")
-AUTOPILOT_SCRIPT = AUTOPILOT_DIR / "scripts" / "autopilot.mjs"
+# Optional Autopilot Node.js engine (if available locally or configured)
+_local_autopilot = Path(__file__).resolve().parent.parent.parent / "scripts" / "autopilot.mjs"
+_skill_autopilot = Path.home() / ".gemini" / "config" / "skills" / "directing-stickman-videos" / "scripts" / "autopilot.mjs"
+
+if _local_autopilot.exists():
+    AUTOPILOT_SCRIPT = _local_autopilot
+    AUTOPILOT_DIR = _local_autopilot.parent.parent
+elif _skill_autopilot.exists():
+    AUTOPILOT_SCRIPT = _skill_autopilot
+    AUTOPILOT_DIR = _skill_autopilot.parent.parent
+else:
+    AUTOPILOT_DIR = Path(__file__).resolve().parent.parent.parent
+    AUTOPILOT_SCRIPT = AUTOPILOT_DIR / "scripts" / "autopilot.mjs"
+
 FFMPEG_DIR = r"C:\ffmpeg\bin"
 
 
 def _get_env_with_ffmpeg() -> dict[str, str]:
-    """Ensure ffmpeg/ffprobe from C:/ffmpeg/bin is in PATH for Node and subprocesses with GPU NVENC enabled."""
+    """Ensure ffmpeg/ffprobe from local ffmpeg or C:/ffmpeg/bin is in PATH for Node and subprocesses with GPU NVENC enabled."""
     env = os.environ.copy()
     current_path = env.get("PATH", "")
-    if FFMPEG_DIR.lower() not in current_path.lower():
-        env["PATH"] = f"{FFMPEG_DIR};{current_path}"
-    env["FFMPEG"] = os.path.join(FFMPEG_DIR, "ffmpeg.exe") if os.path.exists(os.path.join(FFMPEG_DIR, "ffmpeg.exe")) else "ffmpeg"
-    env["FFPROBE"] = os.path.join(FFMPEG_DIR, "ffprobe.exe") if os.path.exists(os.path.join(FFMPEG_DIR, "ffprobe.exe")) else "ffprobe"
+    repo_ffmpeg = Path(__file__).resolve().parent.parent.parent / "ffmpeg"
+    if repo_ffmpeg.exists() and str(repo_ffmpeg).lower() not in current_path.lower():
+        current_path = f"{repo_ffmpeg};{current_path}"
+    if FFMPEG_DIR.lower() not in current_path.lower() and os.path.exists(FFMPEG_DIR):
+        current_path = f"{FFMPEG_DIR};{current_path}"
+    env["PATH"] = current_path
+
+    local_ffmpeg_exe = repo_ffmpeg / "ffmpeg.exe"
+    local_ffprobe_exe = repo_ffmpeg / "ffprobe.exe"
+    if local_ffmpeg_exe.exists():
+        env["FFMPEG"] = str(local_ffmpeg_exe)
+    elif os.path.exists(os.path.join(FFMPEG_DIR, "ffmpeg.exe")):
+        env["FFMPEG"] = os.path.join(FFMPEG_DIR, "ffmpeg.exe")
+    else:
+        env["FFMPEG"] = shutil.which("ffmpeg") or "ffmpeg"
+
+    if local_ffprobe_exe.exists():
+        env["FFPROBE"] = str(local_ffprobe_exe)
+    elif os.path.exists(os.path.join(FFMPEG_DIR, "ffprobe.exe")):
+        env["FFPROBE"] = os.path.join(FFMPEG_DIR, "ffprobe.exe")
+    else:
+        env["FFPROBE"] = shutil.which("ffprobe") or "ffprobe"
+
     env["USE_NVENC"] = "1"
     return env
 
@@ -66,7 +97,8 @@ def _log(cb: Optional[Callable], msg: str) -> None:
 
 def _get_audio_duration(wav_path: str) -> float:
     """Return WAV duration in seconds using ffprobe for bit-exact match with autopilot.mjs."""
-    ffprobe_bin = shutil.which("ffprobe") or str(Path(FFMPEG_DIR) / "ffprobe.exe")
+    repo_ffprobe = Path(__file__).resolve().parent.parent.parent / "ffmpeg" / "ffprobe.exe"
+    ffprobe_bin = shutil.which("ffprobe") or (str(repo_ffprobe) if repo_ffprobe.exists() else str(Path(FFMPEG_DIR) / "ffprobe.exe"))
     if os.path.exists(ffprobe_bin):
         try:
             import json as _json
@@ -485,7 +517,7 @@ class CISPipeline:
             )
 
         if not output_mp4 or not Path(output_mp4).exists():
-            _log(log_callback, "Using native direct FFmpeg compositing fallback…")
+            _log(log_callback, "Executing Native Python + FFmpeg illustrated compositing engine…")
             output_mp4 = self._render_ffmpeg_fallback(
                 storyboard=storyboard,
                 scene_png_paths=scene_png_paths,
