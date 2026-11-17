@@ -100,7 +100,17 @@ def _build_captions(
             c_end = round(min(max_safe_end, c_start + c_dur), 3)
             if c_end <= c_start:
                 c_end = round(min(max_safe_end, c_start + 0.1), 3)
-            captions.append({"start": c_start, "end": c_end, "text": c_text})
+            
+            chunk_words = c_text.split()
+            word_list = []
+            if chunk_words:
+                w_step = (c_end - c_start) / max(1, len(chunk_words))
+                for w_i, word_str in enumerate(chunk_words):
+                    w_s = round(c_start + w_i * w_step, 3)
+                    w_e = round(w_s + w_step, 3)
+                    word_list.append({"word": word_str, "start": w_s, "end": w_e})
+
+            captions.append({"start": c_start, "end": c_end, "text": c_text, "words": word_list})
             t_cursor = c_end
             last_end = c_end
 
@@ -249,6 +259,7 @@ def generate_shot_procedural_background(
     draw_grid: bool = False,
     style: str = "B1",
     accent: str = "#38BDF8",
+    topic: str = "",
 ) -> bool:
     """Generate an individual, topic-tailored procedural vector background for this shot."""
     p = Path(output_path)
@@ -262,7 +273,8 @@ def generate_shot_procedural_background(
         im = Image.open(output_path).convert("RGBA")
         d = ImageDraw.Draw(im)
         floor_y = int(height * 0.74)
-        narr = f"{scene.get('narration', '')} {scene.get('scene_title', '')}".strip()
+        topic_val = str(topic or scene.get("topic") or "").strip()
+        narr = f"{topic_val}. {scene.get('narration', '')} {scene.get('scene_title', '')}".strip()
 
         style_params = {
             "fg": "#E2E8F0" if is_dark else "#334155",
@@ -388,6 +400,67 @@ def _rotated_xy(
     return round(x, 1), round(y, 1)
 
 
+def _generate_alive_keyframes(
+    cx_base: float,
+    cy_base: float,
+    w_base: float,
+    img_w: int,
+    img_h: int,
+    from_frac: float,
+    to_frac: float,
+    span: float,
+    sz_fn,
+    lerp_t_fn,
+    base_angle: float = 0.0,
+) -> list[dict[str, Any]]:
+    """Generate continuous organic living kinematics (breathing, sway, emphasis gesture) so actors never freeze."""
+    keys: list[dict[str, Any]] = []
+    dur_sec = max(0.2, (to_frac - from_frac) * span)
+    steps = max(3, min(16, int(round(dur_sec / 0.42))))
+
+    for i in range(1, steps + 1):
+        frac = from_frac + (i / float(steps)) * (to_frac - from_frac)
+        t_sec = frac * span
+
+        # 1. Breathing cycle (~1.25 Hz)
+        t_breath = t_sec * 2.0 * math.pi * 1.25
+        dy_breath = math.sin(t_breath) * sz_fn(4.5)
+        dw_breath = w_base * (1.0 + 0.012 * math.cos(t_breath))
+
+        # 2. Subtle weight sway (~0.65 Hz)
+        t_sway = t_sec * 2.0 * math.pi * 0.65 + 0.5
+        dx_sway = math.sin(t_sway) * sz_fn(3.2)
+        dang_sway = math.sin(t_sway) * 0.016
+
+        # 3. Narrative emphasis gesture envelope (peaks around mid-shot)
+        norm_progress = (frac - from_frac) / max(0.01, to_frac - from_frac)
+        if 0.38 <= norm_progress <= 0.62:
+            env = math.sin((norm_progress - 0.38) / 0.24 * math.pi)
+            dy_gest = -sz_fn(7.0) * env
+            dang_gest = 0.028 * env
+            dw_gest = w_base * 0.02 * env
+        else:
+            dy_gest = 0.0
+            dang_gest = 0.0
+            dw_gest = 0.0
+
+        cur_cx = cx_base + dx_sway
+        cur_cy = cy_base + dy_breath + dy_gest
+        cur_w = dw_breath + dw_gest
+        cur_ang = base_angle + dang_sway + dang_gest
+
+        kx, ky = _rotated_xy(cur_cx, cur_cy, cur_w, img_w, img_h, cur_ang)
+        keys.append({
+            "t": lerp_t_fn(frac),
+            "x": kx,
+            "y": ky,
+            "w": cur_w,
+            "angle": cur_ang,
+            "alpha": 1.0,
+        })
+    return keys
+
+
 def _animate_sprite(
     spec: dict[str, Any],
     meta: dict[str, Any],
@@ -407,6 +480,19 @@ def _animate_sprite(
     to_t = _norm_t(to_f, span) if to_f < 0.99 else None
     w = sz(float(spec.get("w", 320)))
 
+    sp_name = str(spec.get("sprite", ""))
+    sp_name_l = sp_name.lower()
+    actor_keywords = (
+        "actor", "hero", "thinker", "climber", "runner", "trader", "doctor",
+        "student", "person", "stickman", "worker", "coder", "boss", "couple",
+        "pedestal", "mentor", "user", "speaker", "seeker", "giver", "fig",
+        "expert", "master", "challenger", "winner", "rival", "player", "audience",
+        "patient", "client", "buyer", "seller", "founder", "leader"
+    )
+    is_actor = (spec.get("is_actor", False) or any(k in sp_name_l for k in actor_keywords)) and not any(
+        ck in sp_name_l for ck in ("card", "badge", "banner", "board", "wall", "cliff", "floor", "bg", "lamp", "bulb", "screen", "chart", "window", "pill", "ring", "aura", "spark", "phone", "goal", "button", "shield")
+    )
+
     def _lerp_t(p: float) -> float:
         end_p = min(1.0, to_f) if to_t is not None else 1.0
         return _norm_t(from_f + p * max(0.08, end_p - from_f), span)
@@ -420,14 +506,17 @@ def _animate_sprite(
         cx1, cy1 = pt(float(spec.get("cx1", 850)), float(spec.get("cy1", 1050)))
         hops = max(2, min(6, int(spec.get("hops", 3))))
         steps = hops * 2 + 1
+        walk_end_frac = 0.55 if (is_actor and to_f >= 0.95 and spec.get("hops", 3) <= 2) else 1.0
         for k in range(steps):
-            frac = k / float(steps - 1)
-            cx = cx0 + (cx1 - cx0) * frac
-            lift = -abs(math.sin(frac * hops * math.pi)) * sz(34.0)
-            cy = cy0 + (cy1 - cy0) * frac + lift
-            ang = 0.045 * math.sin(frac * hops * math.pi * 2)
+            frac = (k / float(steps - 1)) * walk_end_frac
+            cx = cx0 + (cx1 - cx0) * (k / float(steps - 1))
+            lift = -abs(math.sin((k / float(steps - 1)) * hops * math.pi)) * sz(34.0)
+            cy = cy0 + (cy1 - cy0) * (k / float(steps - 1)) + lift
+            ang = 0.045 * math.sin((k / float(steps - 1)) * hops * math.pi * 2)
             x, y = _rotated_xy(cx, cy, w, img_w, img_h, ang)
             raw_keys.append({"t": _lerp_t(frac), "x": x, "y": y, "w": w, "angle": ang, "alpha": 1.0 if k > 0 else 0.7})
+        if is_actor and walk_end_frac < 0.95:
+            raw_keys.extend(_generate_alive_keyframes(cx1, cy1, w, img_w, img_h, walk_end_frac, 1.0, span, sz, _lerp_t))
         init_x, init_y = raw_keys[0]["x"], raw_keys[0]["y"]
 
     elif anim == "hop_steps":
@@ -462,7 +551,6 @@ def _animate_sprite(
         ang0 = float(spec.get("ang0", 0.0))
         ang_mid = float(spec.get("ang_mid", ang0))
         ang1 = float(spec.get("ang1", 0.3))
-        sp_name = str(spec.get("sprite", ""))
         # Stagger domino wave naturally when multiple dom1..dom4 appear
         t_delay = 0.0
         if sp_name.startswith("dom") and sp_name[-1:].isdigit():
@@ -481,23 +569,40 @@ def _animate_sprite(
 
     elif anim == "pop_bounce":
         cx, cy = init_cx, init_cy
-        for frac, mult, a in [(0.0, 0.72, 0.0), (0.14, 1.07, 1.0), (0.30, 1.0, 1.0), (1.0, 1.02, 1.0)]:
-            wk = w * mult
-            x, y = _rotated_xy(cx, cy, wk, img_w, img_h, 0.0)
-            raw_keys.append({"t": _lerp_t(frac), "x": x, "y": y, "w": wk, "alpha": a})
+        if is_actor:
+            for frac, mult, a in [(0.0, 0.72, 0.0), (0.14, 1.07, 1.0), (0.28, 1.0, 1.0)]:
+                wk = w * mult
+                x, y = _rotated_xy(cx, cy, wk, img_w, img_h, 0.0)
+                raw_keys.append({"t": _lerp_t(frac), "x": x, "y": y, "w": wk, "alpha": a})
+            raw_keys.extend(_generate_alive_keyframes(cx, cy, w, img_w, img_h, 0.28, 1.0, span, sz, _lerp_t))
+        else:
+            for frac, mult, a in [(0.0, 0.72, 0.0), (0.14, 1.07, 1.0), (0.30, 1.0, 1.0), (1.0, 1.02, 1.0)]:
+                wk = w * mult
+                x, y = _rotated_xy(cx, cy, wk, img_w, img_h, 0.0)
+                raw_keys.append({"t": _lerp_t(frac), "x": x, "y": y, "w": wk, "alpha": a})
         init_x, init_y = raw_keys[0]["x"], raw_keys[0]["y"]
 
     elif anim == "slide_in":
         cx0, cy0 = pt(float(spec.get("cx0", 200)), float(spec.get("cy0", 980)))
         cx1, cy1 = pt(float(spec.get("cx1", 640)), float(spec.get("cy1", 980)))
-        for frac, px, py, a in [
-            (0.0, cx0, cy0, 0.0),
-            (0.45, cx1 + (cx1 - cx0) * 0.04, cy1, 1.0),
-            (0.65, cx1, cy1, 1.0),
-            (1.0, cx1, cy1 - sz(6.0), 1.0),
-        ]:
-            x, y = _rotated_xy(px, py, w, img_w, img_h, 0.0)
-            raw_keys.append({"t": _lerp_t(frac), "x": x, "y": y, "w": w, "alpha": a})
+        if is_actor:
+            for frac, px, py, a in [
+                (0.0, cx0, cy0, 0.0),
+                (0.35, cx1 + (cx1 - cx0) * 0.04, cy1, 1.0),
+                (0.50, cx1, cy1, 1.0),
+            ]:
+                x, y = _rotated_xy(px, py, w, img_w, img_h, 0.0)
+                raw_keys.append({"t": _lerp_t(frac), "x": x, "y": y, "w": w, "alpha": a})
+            raw_keys.extend(_generate_alive_keyframes(cx1, cy1, w, img_w, img_h, 0.50, 1.0, span, sz, _lerp_t))
+        else:
+            for frac, px, py, a in [
+                (0.0, cx0, cy0, 0.0),
+                (0.45, cx1 + (cx1 - cx0) * 0.04, cy1, 1.0),
+                (0.65, cx1, cy1, 1.0),
+                (1.0, cx1, cy1 - sz(6.0), 1.0),
+            ]:
+                x, y = _rotated_xy(px, py, w, img_w, img_h, 0.0)
+                raw_keys.append({"t": _lerp_t(frac), "x": x, "y": y, "w": w, "alpha": a})
         init_x, init_y = raw_keys[0]["x"], raw_keys[0]["y"]
 
     elif anim == "sweep":
@@ -943,6 +1048,7 @@ def build_manifest(
     output_project_dir: str,
     aspect_ratio: str = "9:16",
     music_gain: float = 0.12,
+    contains_sfx: bool = False,
 ) -> str:
     """Build valid multi-style (B1/B2/B3), multi-sprite choreographed project.json."""
     out_dir = Path(output_project_dir)
@@ -1023,6 +1129,7 @@ def build_manifest(
             draw_grid=sc_grid,
             style=style,
             accent=sc_accent,
+            topic=str(sc.get("topic") or ""),
         )
         shot_bg_rel = f"assets/scenes/{shot_bg_name}"
 
@@ -1039,7 +1146,7 @@ def build_manifest(
         shots.append({"start": round(shot_start, 3), "end": end, "layers": layers})
 
     captions = _build_captions(scenes, scene_starts, durations, narration_duration)
-    sfx = _build_sfx(scene_starts, narration_duration)
+    sfx = [] if contains_sfx else _build_sfx(scene_starts, narration_duration)
     voice_rel = _make_relative(narration_wav_path, str(out_dir))
 
     manifest: dict[str, Any] = {
@@ -1049,7 +1156,7 @@ def build_manifest(
         "height": height,
         "fps": 30,
         "captionSize": 34 if style != "B2" else 36,
-        "voice": {"path": voice_rel, "lead": 0, "tail": 0},
+        "voice": {"path": voice_rel, "lead": 0, "tail": 0, "contains_sfx": bool(contains_sfx)},
         "captions": captions,
         "shots": shots,
         "sfx": sfx,

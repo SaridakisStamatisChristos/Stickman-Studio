@@ -14,6 +14,7 @@ Features:
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
 from typing import Optional
 
@@ -317,7 +318,19 @@ class CaptionRenderer:
             y = y_start + i * line_h + line_h // 2
             self._draw_text_with_outline(draw, line, cx, y, render_font, self.font_color, self.stroke_color, stroke_w)
 
-        if active_idx >= 0:
+        if active_idx >= 0 and active_idx < len(words):
+            active_w_entry = words[active_idx]
+            w_start = float(active_w_entry.get("start", current_time))
+            w_end = float(active_w_entry.get("end", current_time + 0.30))
+            dur = max(0.08, w_end - w_start)
+            elapsed = max(0.0, current_time - w_start)
+            progress = min(1.0, elapsed / dur)
+
+            # Smooth kinetic spring bounce on word onset (1.14x -> 1.0x)
+            bounce = 1.0 + 0.14 * math.sin(min(1.0, progress * 1.8) * math.pi) if progress < 0.65 else 1.0
+            active_font_size = max(16, int(render_size * bounce))
+            active_font = self.load_font(active_font_size)
+
             word_counter = 0
             for i, line in enumerate(lines):
                 line_words = line.split()
@@ -337,9 +350,27 @@ class CaptionRenderer:
                     line_left = cx - line_w / 2.0
                     word_cx = int(line_left + prefix_w + word_w / 2.0)
                     word_y = y_start + i * line_h + line_h // 2
+
+                    # 1. Vibrant active word highlight pill / neon bloom backdrop (Hormozi / Reels style)
+                    hl_rgb = self._hex_to_rgb(self.highlight_color)
+                    pill_w = max(int(word_w * 1.28), int(active_font_size * 1.15))
+                    pill_h = int(render_size * 1.16)
+                    glow_overlay = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+                    g_draw = ImageDraw.Draw(glow_overlay)
+                    g_draw.rounded_rectangle(
+                        [word_cx - pill_w // 2, word_y - pill_h // 2, word_cx + pill_w // 2, word_y + pill_h // 2],
+                        radius=max(6, pill_h // 3),
+                        fill=(*hl_rgb, 215),
+                    )
+                    frame = Image.alpha_composite(frame.convert("RGBA"), glow_overlay).convert("RGB")
+                    draw = ImageDraw.Draw(frame)
+
+                    # 2. Draw active word with dark contrast on bright pill or white on dark pill
+                    active_text_color = "#0B0F19" if sum(hl_rgb) > 360 else "#FFFFFF"
                     self._draw_text_with_outline(
-                        draw, active_word, word_cx, word_y, render_font,
-                        self.highlight_color, self.stroke_color, stroke_w,
+                        draw, active_word, word_cx, word_y, active_font,
+                        active_text_color, "#000000" if active_text_color == "#FFFFFF" else self.stroke_color,
+                        max(2, stroke_w),
                     )
                     break
                 word_counter += len(line_words)

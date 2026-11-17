@@ -2319,20 +2319,78 @@ def _choreo_dynamic_synthesizer(scene: dict, accent: str, out_dir: Path, prefix:
         ]
         return sprites, sprite_plan, []
 
-    # Other layout modes: Graphic insight banner card
-    im_c, dc = _make_sprite(860, 380)
-    hand_rect(dc, 20, 20, 820, 340, seed=seed, lw=4, color=accent, fill=card_bg, r=20)
-    draw_fitted_text(dc, headline, 430, 70, max_w=760, target_size=32, family="noto", fill=accent, bold=True)
-    draw_semantic_prop(dc, prop_kind, 430, 205, 80, accent=accent, ink=ink, card_bg=card_bg, seed=seed)
+    if layout_mode == "split_screen":
+        # Split Screen: Contrasting duel / comparison layout
+        im_p, dp = _make_sprite(380, 380)
+        draw_semantic_prop(dp, prop_kind, 190, 190, 140, accent=accent, ink=ink, card_bg=card_bg, seed=seed)
+        _save_sprite(sprites, "synth_prop", im_p, out_dir, prefix)
+
+        sprite_plan = [
+            {"sprite": "synth_actor", "anim": "slide_in", "cx0": 140, "cy0": 1140, "cx1": 310, "cy1": 1140, "w": 360, "from_f": 0.0, "to_f": 1.0},
+            {"sprite": "synth_prop", "anim": "pop_bounce", "cx0": 780, "cy0": 1060, "w": 380, "from_f": 0.18, "to_f": 1.0},
+        ]
+        vector_plan = [
+            {"kind": "line", "p1": [640, 380], "p2": [640, 1420], "color": th["ink_faint"], "lw": 3, "from_f": 0.0, "to_f": 0.40},
+        ]
+        return sprites, sprite_plan, vector_plan
+
+    if layout_mode == "floating_callout":
+        # Floating Callout: Lower-third focus with wide open upper panoramic staging
+        im_p, dp = _make_sprite(400, 400)
+        draw_semantic_prop(dp, prop_kind, 200, 200, 150, accent=accent, ink=ink, card_bg=card_bg, seed=seed)
+        _save_sprite(sprites, "synth_prop", im_p, out_dir, prefix)
+
+        sprite_plan = [
+            {"sprite": "synth_actor", "anim": "slide_in", "cx0": 180, "cy0": 1040, "cx1": 340, "cy1": 1040, "w": 380, "from_f": 0.0, "to_f": 1.0},
+            {"sprite": "synth_prop", "anim": "pop_bounce", "cx0": 770, "cy0": 960, "w": 390, "from_f": 0.16, "to_f": 1.0},
+        ]
+        return sprites, sprite_plan, []
+
+    if layout_mode == "editorial_spread":
+        # Editorial Spread: Asymmetrical editorial layout with hero anchored on right
+        im_p, dp = _make_sprite(360, 360)
+        draw_semantic_prop(dp, prop_kind, 180, 180, 130, accent=accent, ink=ink, card_bg=card_bg, seed=seed)
+        _save_sprite(sprites, "synth_prop", im_p, out_dir, prefix)
+
+        sprite_plan = [
+            {"sprite": "synth_prop", "anim": "pop_bounce", "cx0": 330, "cy0": 980, "w": 340, "from_f": 0.10, "to_f": 1.0},
+            {"sprite": "synth_actor", "anim": "slide_in", "cx0": 980, "cy0": 1120, "cx1": 810, "cy1": 1120, "w": 370, "from_f": 0.0, "to_f": 1.0},
+        ]
+        vector_plan = [
+            {"kind": "line", "p1": [120, 1260], "p2": [1160, 1260], "color": th["ink_muted"], "lw": 3, "from_f": 0.0, "to_f": 0.60},
+        ]
+        return sprites, sprite_plan, vector_plan
+
+    if layout_mode == "comic_beats":
+        # Comic Beats: Speech/thought bubble above the interacting character
+        im_b, db = _make_sprite(520, 260)
+        hand_rect(db, 14, 14, 492, 232, seed=seed + 6, lw=4, color=accent, fill=card_bg, r=28, shadow=True)
+        draw_semantic_prop(db, prop_kind, 100, 130, 75, accent=accent, ink=ink, card_bg=card_bg, seed=seed)
+        draw_fitted_text(db, headline, 310, 80, max_w=340, target_size=26, family="caveat", fill=ink, bold=True)
+        clean_sub = " ".join(narration.split()[:6])
+        draw_fitted_text(db, clean_sub, 310, 160, max_w=340, target_size=20, family="noto", fill=th["ink_muted"])
+        _save_sprite(sprites, "synth_bubble", im_b, out_dir, prefix)
+
+        sprite_plan = [
+            {"sprite": "synth_actor", "anim": "walk_to", "cx0": 260, "cy0": 1160, "cx1": 360, "cy1": 1160, "w": 390, "from_f": 0.0, "to_f": 1.0, "hops": 1},
+            {"sprite": "synth_bubble", "anim": "pop_bounce", "cx0": 740, "cy0": 820, "w": 520, "from_f": 0.22, "to_f": 1.0},
+        ]
+        return sprites, sprite_plan, []
+
+    # Big Typo Banner Layout: Impact graphic takeaway card
+    im_c, dc = _make_sprite(920, 360)
+    hand_rect(dc, 20, 20, 880, 320, seed=seed, lw=4, color=accent, fill=card_bg, r=22, shadow=True)
+    draw_fitted_text(dc, headline, 460, 75, max_w=820, target_size=34, family="noto", fill=accent, bold=True)
+    draw_semantic_prop(dc, prop_kind, 460, 195, 80, accent=accent, ink=ink, card_bg=card_bg, seed=seed)
     clean_sub = " ".join(narration.split()[:8])
     if len(narration.split()) > 8:
         clean_sub += "..."
-    draw_fitted_text(dc, clean_sub, 430, 315, max_w=760, target_size=22, family="noto", fill=th["ink_muted"])
+    draw_fitted_text(dc, clean_sub, 460, 295, max_w=820, target_size=22, family="noto", fill=th["ink_muted"])
     _save_sprite(sprites, "synth_card", im_c, out_dir, prefix)
 
     sprite_plan = [
-        {"sprite": "synth_card", "anim": "slide_in", "cx0": 540, "cy0": 680, "cx1": 540, "cy1": 710, "w": 860, "from_f": 0.05, "to_f": 1.0},
-        {"sprite": "synth_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1160, "w": 320, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "synth_card", "anim": "slide_in", "cx0": 540, "cy0": 500, "cx1": 540, "cy1": 530, "w": 920, "from_f": 0.05, "to_f": 1.0},
+        {"sprite": "synth_actor", "anim": "pop_bounce", "cx0": 540, "cy0": 1220, "w": 340, "from_f": 0.0, "to_f": 1.0},
     ]
     return sprites, sprite_plan, []
 
@@ -2414,7 +2472,8 @@ class CISSceneIllustrator:
         d = ImageDraw.Draw(comp)
         seed = int(scene.get("variant_seed", 42))
         floor_y = int(h * 0.74)
-        narr = (str(scene.get("narration", "")) + " " + str(scene.get("scene_title", "")) + " " + str(scene.get("choreography", ""))).lower()
+        topic_str = str(scene.get("topic", "")).strip()
+        narr = (f"{topic_str}. " if topic_str else "") + (str(scene.get("narration", "")) + " " + str(scene.get("scene_title", "")) + " " + str(scene.get("choreography", ""))).lower()
         layout_mode = str(scene.get("layout_mode", "clean_stage"))
 
         # 1. Synthesize Unique Thematic Vector Environment from narration via AIBackgroundEngine
@@ -2548,8 +2607,17 @@ class CISSceneIllustrator:
 
         if raw_title and len(raw_title) > 2:
             if layout_mode == "clean_stage":
-                # Clean Stage: No top banner box! Pure visual diorama where characters & art breathe freely.
-                pass
+                if int(scene.get("scene_id", 1)) == 1:
+                    # Clean Stage Hook: Elegant floating topic pill so viewer immediately recognizes the subject
+                    badge_w = min(int(w * 0.76), 660)
+                    badge_h = 58
+                    bx = (w - badge_w) // 2
+                    by = int(h * 0.06)
+                    d.rounded_rectangle([bx, by, bx + badge_w, by + badge_h], radius=28, fill=th["card_bg"], outline=accent, width=2)
+                    draw_fitted_text(d, f"✦  {raw_title}", bx + badge_w // 2, by + badge_h // 2, max_w=badge_w - 40, target_size=28, family="caveat", fill=accent, bold=True)
+                else:
+                    # Clean Stage: No top banner box! Pure visual diorama where characters & art breathe freely.
+                    pass
             elif layout_mode == "split_screen":
                 # Split Screen: Subtle center comparison line with contrasting left/right topic badges
                 hand_line(d, w // 2, int(h * 0.16), w // 2, floor_y - 20, seed=seed, lw=3, color=th["ink_faint"])
@@ -2599,6 +2667,21 @@ class CISSceneIllustrator:
             sym = particle_symbols[p_idx % len(particle_symbols)]
             col = accent if p_idx % 2 == 0 else th["ink_muted"]
             d.text((px, py), sym, fill=col, font=ImageFont.load_default(), anchor="mm")
+
+        # 7. Adaptive Mood Lighting & Emotional Color Grading
+        emotion = str(scene.get("emotion", "")).upper()
+        if emotion in ("TRIUMPH", "HAPPY", "JOY", "EXCITED", "CONFIDENT"):
+            wash = Image.new("RGBA", (w, h), (255, 195, 75, 16))
+            comp = Image.alpha_composite(comp, wash)
+        elif emotion in ("SAD", "STRESSED", "STRUGGLE", "DEPRESSED", "FEAR", "TIRED"):
+            wash = Image.new("RGBA", (w, h), (15, 23, 42, 24))
+            comp = Image.alpha_composite(comp, wash)
+        elif emotion in ("SHOCK", "WARNING", "ALERT", "ANGRY", "DANGER"):
+            wash = Image.new("RGBA", (w, h), (239, 68, 68, 18))
+            comp = Image.alpha_composite(comp, wash)
+        elif emotion in ("CALM", "STOIC", "CONTEMPLATIVE", "ZEN", "NEUTRAL"):
+            wash = Image.new("RGBA", (w, h), (16, 185, 129, 12))
+            comp = Image.alpha_composite(comp, wash)
 
         return comp
 

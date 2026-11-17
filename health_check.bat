@@ -114,6 +114,15 @@ if errorlevel 1 (
     echo   [OK]   Embedded In-Process AI Director ready [Zero Ollama required]
 )
 
+:: In-Process Neural Semantic Brain (MiniLM-L6 ONNX)
+echo [CHECK] In-Process Neural Semantic Brain [MiniLM-L6 ONNX]...
+python -c "import sys; sys.path.insert(0, 'src'); from engine.semantic_scene_brain import SemanticSceneBrain; exit(0 if SemanticSceneBrain.is_model_available() else 1)" >nul 2>&1
+if errorlevel 1 (
+    echo   [INFO] Neural Brain weights not found [Procedural heuristic fallback active]
+) else (
+    echo   [OK]   In-Process Neural Semantic Brain ready [MiniLM-L6 INT8 active, ^<10ms inference]
+)
+
 :: Ollama (Optional)
 echo [CHECK] Ollama [Optional external daemon]...
 where ollama >nul 2>&1

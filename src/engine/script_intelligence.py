@@ -85,6 +85,8 @@ class ScriptIntelligenceEngine:
             re.IGNORECASE,
         )
 
+        has_explicit_speakers = False
+
         def flush_turn():
             nonlocal current_buffer, current_emotion, current_visual_hint
             text = " ".join(current_buffer).strip()
@@ -134,6 +136,7 @@ class ScriptIntelligenceEngine:
             # Check for standalone speaker header: **MALE VOICE:**
             if speaker_header_pattern.match(line_str):
                 flush_turn()
+                has_explicit_speakers = True
                 low_h = line_str.lower()
                 if any(k in low_h for k in ("female", n2.lower(), "speaker 2", "voice 2")):
                     current_speaker = 2
@@ -158,6 +161,7 @@ class ScriptIntelligenceEngine:
             inline_m = inline_speaker_pattern.match(line_str)
             if inline_m:
                 flush_turn()
+                has_explicit_speakers = True
                 low_tag = line_str[:inline_m.start(1)].lower()
                 if any(k in low_tag for k in ("female", n2.lower(), "speaker 2", "voice 2")):
                     current_speaker = 2
@@ -176,8 +180,9 @@ class ScriptIntelligenceEngine:
 
         flush_turn()
 
-        # If no explicit speaker tags were found, treat as solo narrator script
-        if not raw_turns:
+        # If no explicit speaker tags were found, treat as solo narrator script and segment by sentence
+        if not has_explicit_speakers:
+            raw_turns = []
             full_clean, hints, emo = cls._clean_narration_line(raw_script)
             sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", full_clean) if len(s.strip().split()) >= 2]
             for s in sentences:
@@ -271,6 +276,24 @@ class ScriptIntelligenceEngine:
         if len(words) <= 18:
             return [text]
 
+        # Sentence-based segmentation for multi-sentence turns
+        sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        if len(sents) >= 2:
+            beats = []
+            curr = ""
+            for s in sents:
+                if not curr:
+                    curr = s
+                elif len((curr + " " + s).split()) <= 18:
+                    curr += " " + s
+                else:
+                    beats.append(curr)
+                    curr = s
+            if curr:
+                beats.append(curr)
+            if len(beats) >= 2:
+                return beats
+
         # Pivots like "But suddenly", "Then, just when", "However", "Instead"
         pivot_pattern = re.compile(
             r"(?<=[.!?])\s+(?=(?:But\s+suddenly|Then,\s+just\s+when|Suddenly|However|Instead|And\s+every\s+unexpected|Psychologists\s+call)\b)",
@@ -280,12 +303,19 @@ class ScriptIntelligenceEngine:
         if len(parts) > 1:
             return [p.strip() for p in parts if p.strip()]
 
-        # Sentence-based fallback for long paragraphs (>32 words)
-        if len(words) > 32:
-            sents = re.split(r"(?<=[.!?])\s+", text)
-            if len(sents) >= 2:
-                mid = len(sents) // 2
-                return [" ".join(sents[:mid]).strip(), " ".join(sents[mid:]).strip()]
+        # For long single sentences (>24 words), split at natural conjunction boundaries
+        if len(words) > 24:
+            conj_parts = re.split(r",\s+(?=(?:but|yet|however|so|because|while|instead|and|then)\b)", text, flags=re.IGNORECASE)
+            if len(conj_parts) >= 2:
+                sub: list[str] = []
+                for p in conj_parts:
+                    p_clean = p.strip().rstrip(",")
+                    if p_clean:
+                        if p_clean[-1] not in ".!?":
+                            p_clean += "."
+                        sub.append(p_clean)
+                if len(sub) >= 2:
+                    return sub
 
         return [text]
 
@@ -295,12 +325,15 @@ class ScriptIntelligenceEngine:
         beat: dict[str, Any],
         context_history: Optional[list[dict[str, Any]]] = None,
         duration: float = 4.0,
+        style_id: str = "a1_classic_bw",
+        topic: str = "",
+        total_beats: int = 1,
     ) -> dict[str, Any]:
         """
         Creates a structured, story-aligned visual scene description for a single dialogue beat.
         Guarantees narrative continuity, character consistency, and exact action correspondence.
         """
-        history = context_history or []
+        history = list(context_history or [])
         last_scene = history[-1] if history else {}
 
         narration = beat["narration"]
@@ -353,8 +386,39 @@ class ScriptIntelligenceEngine:
         effects: list[str] = []
         characters: list[dict[str, Any]] = []
 
+        # Only activate the specialized dating/texting drama scenes if the text is explicitly about romantic drama
+        has_dating_context = any(w in text_lower for w in ("texting", "dating", "romantic", "ex-boyfriend", "ex-girlfriend", "crush", "toxic relationship", "mixed signals", "unanswered calls"))
+
+        # Primary Universal Engine (Procedural + In-Process Neural Semantic Brain)
+        if not has_dating_context:
+            from engine.procedural_scene_engine import ProceduralSceneEngine
+            engine = ProceduralSceneEngine(style_id=style_id)
+            engine.history = list(history)
+            eff_total = max(total_beats, len(history) + 1)
+            proc_sc = engine.generate_scene_for_narration(
+                narration=narration,
+                scene_idx=len(history),
+                total_scenes=eff_total,
+                target_duration=round(max(duration, 1.2), 3),
+                topic=topic,
+            )
+            proc_sc["id"] = len(history) + 1
+            proc_sc["scene_id"] = len(history) + 1
+            proc_sc["speaker"] = speaker
+            proc_sc["speaker_name"] = speaker_name
+
+            if is_female_speaker and proc_sc.get("characters"):
+                c0 = proc_sc["characters"][0]
+                c0["name"] = speaker_name or "Maya"
+                c0["gender"] = "female"
+                c0["hair_style"] = "ponytail"
+                c0["has_eyelashes"] = True
+                c0["cheek_blush"] = True
+
+            return proc_sc
+
         # A. TEXTING ALL NIGHT / SMILING AT SMARTPHONE / WARM MESSAGES
-        if any(k in text_lower for k in ("texting you all night", "texting all night", "asking about your day", "making you feel special", "maybe they actually like me")):
+        if has_dating_context and any(k in text_lower for k in ("texting you all night", "texting all night", "asking about your day", "making you feel special", "maybe they actually like me")):
             action = "TEXTING_PHONE"
             emotion = "HAPPY"
             background = "BEDROOM_NIGHT"
@@ -568,7 +632,7 @@ class ScriptIntelligenceEngine:
             characters = [ca, cb]
 
         # J. FINAL CLIMAX: ADDICTED TO HOPE THAT ONE DAY THEY WILL LOVE YOU
-        elif any(k in text_lower for k in ("addicted to the hope", "love you the way you deserve", "read that again")):
+        elif has_dating_context and any(k in text_lower for k in ("addicted to the hope", "love you the way you deserve")):
             action = "POINT_UP"
             emotion = "CALM"
             background = "STAGE"
@@ -585,37 +649,34 @@ class ScriptIntelligenceEngine:
             cb["speaking"] = True
             characters = [cb]
 
-        # K. GENERAL FALLBACK FOR NON-RELATIONSHIP NARRATIVES
+        # K. GENERAL / UNIVERSAL TOPIC MASTER ENGINE (Procedural + Neural Semantic Brain)
         else:
-            # Semantic keyword fallback
             from engine.procedural_scene_engine import ProceduralSceneEngine
-            engine = ProceduralSceneEngine(style_id="a1_classic_bw")
+            engine = ProceduralSceneEngine(style_id=style_id)
+            engine.history = list(history)
             proc_sc = engine.generate_scene_for_narration(
                 narration=narration,
                 scene_idx=len(history),
-                total_scenes=len(history) + 1,
-                target_duration=duration,
+                total_scenes=max(total_beats, len(history) + 1),
+                target_duration=round(max(duration, 1.2), 3),
+                topic=topic,
             )
-            action = proc_sc.get("action", "PRESENT")
-            emotion = proc_sc.get("emotion", "NEUTRAL")
-            background = proc_sc.get("background", "ABSTRACT")
-            camera = proc_sc.get("camera", "MEDIUM")
-            objects = proc_sc.get("objects", [])
+            proc_sc["id"] = len(history) + 1
+            proc_sc["scene_id"] = len(history) + 1
+            proc_sc["speaker"] = speaker
+            proc_sc["speaker_name"] = speaker_name
 
-            if is_female_speaker:
-                cb = dict(char_b)
-                cb["action"] = action
-                cb["emotion"] = emotion
-                cb["speaking"] = True
-                characters = [cb]
-            else:
-                ca = dict(char_a)
-                ca["action"] = action
-                ca["emotion"] = emotion
-                ca["speaking"] = True
-                characters = [ca]
+            if is_female_speaker and proc_sc.get("characters"):
+                c0 = proc_sc["characters"][0]
+                c0["name"] = speaker_name or "Maya"
+                c0["gender"] = "female"
+                c0["hair_style"] = "ponytail"
+                c0["has_eyelashes"] = True
+                c0["cheek_blush"] = True
 
-        # Build clean scene dictionary
+            return proc_sc
+
+        # Build clean scene dictionary for dating drama
         scene_dict: dict[str, Any] = {
             "id": len(history) + 1,
             "scene_id": len(history) + 1,
@@ -632,6 +693,7 @@ class ScriptIntelligenceEngine:
             "effects": effects,
             "transition": "FADE",
             "transition_in": "FADE",
+            "_metaphor": "DATING_DRAMA",
         }
 
         return scene_dict

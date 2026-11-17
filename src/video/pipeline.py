@@ -297,6 +297,9 @@ class VideoPipeline:
                     beat=beat,
                     context_history=scenes,
                     duration=scene_dur,
+                    style_id=style,
+                    topic=topic,
+                    total_beats=total_beats,
                 )
                 sc["_audio_path"] = synth_path
                 sc["_audio_duration"] = dur

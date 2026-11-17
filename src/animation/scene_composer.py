@@ -167,176 +167,196 @@ class SceneComposer:
         scene_id = int(scene.get("id", 1))
         has_sitting_actor = any(str(c.get("action", "")).upper() in ("SIT", "READ", "WRITE") for c in characters)
 
+        layout_arch = str(scene.get("layout_archetype", "STAGE_STANDARD")).upper()
+        is_archetype_layout = layout_arch in (
+            "SPLIT_SCREEN", "FULLSCREEN_INFOGRAPHIC", "HERD_REBEL",
+            "SCALE_CONTRAST", "HERO_PROP_MECHANIC", "KINETIC_CONCEPT_CARD"
+        )
+
         for f in range(n_frames):
             t = f / max(n_frames - 1, 1)
             time_sec = f / float(max(1, self.fps))
             img = base_bg.copy()
 
-            # 1. Animated scene props / metaphors behind characters (2x AA)
-            fg_furniture, primary_prop_center = self._draw_scene_objects_aa(
-                img, scene, self.width, self.height, t=t, floor_y=floor_y,
-                defer_foreground=has_sitting_actor,
-            )
-
-            # Precompute animated joints per character
-            char_joints_list = []
-            for idx_c, (char, cfg) in enumerate(zip(characters, char_configs)):
-                px, py = cfg["positions"][f]
-                action = str(char.get("action", "STAND")).upper()
-                facing = char.get("facing", "right")
-                scale = char_scales[idx_c]
-                joints = self.renderer.get_animated_joints(
-                    action=action,
-                    t_norm=t,
-                    time_sec=time_sec,
-                    scale=scale,
-                    facing=facing,
-                )
-                char_joints_list.append((px, py, scale, facing, joints))
-
-            # 2. Characters (2x supersampled sprite AA, style outfits & expressions)
-            for idx_c, (char, (px, py, scale, facing, joints)) in enumerate(zip(characters, char_joints_list)):
-                act_u = str(char.get("action", "STAND")).upper()
-                if act_u in ("SIT", "READ", "WRITE") and self.pack.id != "a3_prehistoric_cave":
-                    # Auto-support any sitting character with a crisp chair right under hips (except stone-age cave floor)
-                    cw = max(36, int(38 * scale))
-                    ch = max(46, int(60 * scale))
-                    cx_ch = int(px - (cw * 0.56 if facing == "right" else cw * 0.24))
-                    cy_ch = int(floor_y - ch + int(2 * scale))
-                    self.assets.render_asset_aa(img, "CHAIR", cx_ch, cy_ch, cw, ch, t=t)
-
-                col = char.get("color") or self._get_character_color(char.get("id", f"P{idx_c}"), idx_c)
-                base_emo = str(char.get("emotion") or scene.get("emotion") or "NEUTRAL").upper()
-                # Dynamic in-scene emotional beat transition:
-                # Reactions snap in at beat t >= 0.28 (anticipation -> shock/cringe/happy)
-                if base_emo in ("SURPRISED", "SHOCKED", "CRINGE", "DISGUST") and t < 0.28:
-                    emo = "CALM" if "BED" in act_u or act_u == "STAND" else "NEUTRAL"
-                elif base_emo in ("HAPPY", "EXCITED") and t < 0.20:
-                    emo = "NEUTRAL"
-                else:
-                    emo = base_emo
-
-                is_fem = bool(char.get("gender") == "female" or str(char.get("name", "")).lower() in ("maya", "female") or char.get("id") == "person_b")
-                acc = char.get("accessory") or ("ponytail" if is_fem else None)
-                eff_outfit = char.get("outfit") or ("feminine_silhouette" if is_fem else None)
-                talk = bool(char.get("speaking", idx_c == 0 and len(characters) == 1))
-
-                # Gaze tracking: Partner's head in dialogue, or focal prop center in solitary scenes
-                if len(char_joints_list) > 1:
-                    partner_idx = 1 if idx_c == 0 else 0
-                    partner_px, partner_py, _, _, _ = char_joints_list[partner_idx]
-                    gaze_tgt = (float(partner_px), float(partner_py) - 52.0 * scale)
-                elif primary_prop_center is not None:
-                    gaze_tgt = primary_prop_center
-                else:
-                    gaze_tgt = None
-
-                self.renderer.render_character_on_frame(
-                    img,
-                    int(px),
-                    int(py),
-                    pose=act_u,
-                    scale=scale,
-                    facing=facing,
-                    color_override=col,
-                    emotion_override=emo,
-                    joints_override=joints,
-                    time_sec=time_sec,
-                    speaking=talk,
-                    accessory=acc,
-                    outfit_override=eff_outfit,
-                    char_index=1 if is_fem else idx_c,
-                    gaze_target=gaze_tgt,
+            if is_archetype_layout:
+                if layout_arch == "SPLIT_SCREEN":
+                    self._render_split_screen(img, scene, t, time_sec, res_scale, floor_y)
+                elif layout_arch == "FULLSCREEN_INFOGRAPHIC":
+                    self._render_fullscreen_infographic(img, scene, t, time_sec, res_scale, floor_y)
+                elif layout_arch == "HERD_REBEL":
+                    self._render_herd_rebel(img, scene, t, time_sec, res_scale, floor_y)
+                elif layout_arch == "SCALE_CONTRAST":
+                    self._render_scale_contrast(img, scene, t, time_sec, res_scale, floor_y)
+                elif layout_arch == "HERO_PROP_MECHANIC":
+                    self._render_hero_prop_mechanic(img, scene, t, time_sec, res_scale, floor_y)
+                elif layout_arch == "KINETIC_CONCEPT_CARD":
+                    self._render_kinetic_concept_card(img, scene, t, time_sec, res_scale, floor_y)
+            else:
+                # 1. Animated scene props / metaphors behind characters (2x AA)
+                fg_furniture, primary_prop_center = self._draw_scene_objects_aa(
+                    img, scene, self.width, self.height, t=t, floor_y=floor_y,
+                    defer_foreground=has_sitting_actor,
                 )
 
-                # Held object attached cleanly to active hand + arc transfer for GIVE->RECEIVE
-                held = char.get("held_object", "")
-                if not held:
-                    if any(k in act_u for k in ("PHONE", "SCROLL_PHONE")):
-                        held = "PHONE"
-                    elif act_u == "COUNT_MONEY":
-                        held = "MONEY"
-                if held:
-                    hx, hy = self.renderer.get_hand_position(
-                        int(px), int(py), scale=scale, facing=facing, hand="right", joints_override=joints
+                # Precompute animated joints per character
+                char_joints_list = []
+                for idx_c, (char, cfg) in enumerate(zip(characters, char_configs)):
+                    px, py = cfg["positions"][f]
+                    action = str(char.get("action", "STAND")).upper()
+                    facing = char.get("facing", "right")
+                    scale = char_scales[idx_c]
+                    joints = self.renderer.get_animated_joints(
+                        action=action,
+                        t_norm=t,
+                        time_sec=time_sec,
+                        scale=scale,
+                        facing=facing,
                     )
-                    if str(char.get("action", "")).upper() == "GIVE" and len(char_joints_list) > 1 and idx_c == 0:
-                        rx_p, ry_p, r_sc, r_fac, r_j = char_joints_list[1]
-                        rhx, rhy = self.renderer.get_hand_position(
-                            int(rx_p), int(ry_p), scale=r_sc, facing=r_fac, hand="right", joints_override=r_j
-                        )
-                        pass_t = max(0.0, min(1.0, (t - 0.25) / 0.45))
-                        ease_p = self._ease_in_out(pass_t)
-                        hx = int(_lerp(hx, rhx, ease_p * 0.72))
-                        hy = int(_lerp(hy, rhy, ease_p * 0.72) - math.sin(ease_p * math.pi) * 20 * res_scale)
-                    obj_sz = int(38 * scale)
-                    held_u = str(held).upper()
-                    if held_u == "PHONE":
-                        ow_h, oh_h = int(obj_sz * 0.60), int(obj_sz * 1.05)
-                    elif held_u == "MONEY":
-                        ow_h, oh_h = int(obj_sz * 1.35), int(obj_sz * 0.80)
-                    elif held_u in ("SPEAR", "CLUB"):
-                        ow_h, oh_h = int(obj_sz * 1.45), int(obj_sz * 1.45)
+                    char_joints_list.append((px, py, scale, facing, joints))
+
+                # 2. Characters (2x supersampled sprite AA, style outfits & expressions)
+                for idx_c, (char, (px, py, scale, facing, joints)) in enumerate(zip(characters, char_joints_list)):
+                    act_u = str(char.get("action", "STAND")).upper()
+                    if act_u in ("SIT", "READ", "WRITE") and self.pack.id != "a3_prehistoric_cave":
+                        # Auto-support any sitting character with a crisp chair right under hips (except stone-age cave floor)
+                        cw = max(36, int(38 * scale))
+                        ch = max(46, int(60 * scale))
+                        cx_ch = int(px - (cw * 0.56 if facing == "right" else cw * 0.24))
+                        cy_ch = int(floor_y - ch + int(2 * scale))
+                        self.assets.render_asset_aa(img, "CHAIR", cx_ch, cy_ch, cw, ch, t=t)
+
+                    col = char.get("color") or self._get_character_color(char.get("id", f"P{idx_c}"), idx_c)
+                    base_emo = str(char.get("emotion") or scene.get("emotion") or "NEUTRAL").upper()
+                    # Dynamic in-scene emotional beat transition:
+                    # Reactions snap in at beat t >= 0.28 (anticipation -> shock/cringe/happy)
+                    if base_emo in ("SURPRISED", "SHOCKED", "CRINGE", "DISGUST") and t < 0.28:
+                        emo = "CALM" if "BED" in act_u or act_u == "STAND" else "NEUTRAL"
+                    elif base_emo in ("HAPPY", "EXCITED") and t < 0.20:
+                        emo = "NEUTRAL"
                     else:
-                        ow_h, oh_h = obj_sz, obj_sz
-                    self.assets.render_asset_aa(
-                        img, held_u,
-                        hx - ow_h // 2, hy - oh_h // 2,
-                        ow_h, oh_h, t=t,
+                        emo = base_emo
+
+                    is_fem = bool(char.get("gender") == "female" or str(char.get("name", "")).lower() in ("maya", "female") or char.get("id") == "person_b")
+                    acc = char.get("accessory") or ("ponytail" if is_fem else None)
+                    eff_outfit = char.get("outfit") or ("feminine_silhouette" if is_fem else None)
+                    talk = bool(char.get("speaking", idx_c == 0 and len(characters) == 1))
+
+                    # Gaze tracking: Partner's head in dialogue, or focal prop center in solitary scenes
+                    if len(char_joints_list) > 1:
+                        partner_idx = 1 if idx_c == 0 else 0
+                        partner_px, partner_py, _, _, _ = char_joints_list[partner_idx]
+                        gaze_tgt = (float(partner_px), float(partner_py) - 52.0 * scale)
+                    elif primary_prop_center is not None:
+                        gaze_tgt = primary_prop_center
+                    else:
+                        gaze_tgt = None
+
+                    self.renderer.render_character_on_frame(
+                        img,
+                        int(px),
+                        int(py),
+                        pose=act_u,
+                        scale=scale,
+                        facing=facing,
+                        color_override=col,
+                        emotion_override=emo,
+                        joints_override=joints,
+                        time_sec=time_sec,
+                        speaking=talk,
+                        accessory=acc,
+                        outfit_override=eff_outfit,
+                        char_index=1 if is_fem else idx_c,
+                        gaze_target=gaze_tgt,
                     )
 
-                # Foreground table + coffee cup right in front of sitting character for natural depth!
-                if idx_c == len(characters) - 1 and fg_furniture:
-                    for asset, ox, oy, ow, oh, color in fg_furniture:
-                        self.assets.render_asset_aa(img, asset, ox, oy, ow, oh, color, t=t)
+                    # Held object attached cleanly to active hand + arc transfer for GIVE->RECEIVE
+                    held = char.get("held_object", "")
+                    if not held:
+                        if any(k in act_u for k in ("PHONE", "SCROLL_PHONE")):
+                            held = "PHONE"
+                        elif act_u == "COUNT_MONEY":
+                            held = "MONEY"
+                    if held:
+                        hx, hy = self.renderer.get_hand_position(
+                            int(px), int(py), scale=scale, facing=facing, hand="right", joints_override=joints
+                        )
+                        if str(char.get("action", "")).upper() == "GIVE" and len(char_joints_list) > 1 and idx_c == 0:
+                            rx_p, ry_p, r_sc, r_fac, r_j = char_joints_list[1]
+                            rhx, rhy = self.renderer.get_hand_position(
+                                int(rx_p), int(ry_p), scale=r_sc, facing=r_fac, hand="right", joints_override=r_j
+                            )
+                            pass_t = max(0.0, min(1.0, (t - 0.25) / 0.45))
+                            ease_p = self._ease_in_out(pass_t)
+                            hx = int(_lerp(hx, rhx, ease_p * 0.72))
+                            hy = int(_lerp(hy, rhy, ease_p * 0.72) - math.sin(ease_p * math.pi) * 20 * res_scale)
+                        obj_sz = int(38 * scale)
+                        held_u = str(held).upper()
+                        if held_u == "PHONE":
+                            ow_h, oh_h = int(obj_sz * 0.60), int(obj_sz * 1.05)
+                        elif held_u == "MONEY":
+                            ow_h, oh_h = int(obj_sz * 1.35), int(obj_sz * 0.80)
+                        elif held_u in ("SPEAR", "CLUB"):
+                            ow_h, oh_h = int(obj_sz * 1.45), int(obj_sz * 1.45)
+                        else:
+                            ow_h, oh_h = obj_sz, obj_sz
+                        self.assets.render_asset_aa(
+                            img, held_u,
+                            hx - ow_h // 2, hy - oh_h // 2,
+                            ow_h, oh_h, t=t,
+                        )
 
-                # Contextual Speech & Thought Bubbles (smooth spring pop-in, text readable once open)
-                pop = min(1.0, t / 0.16) if t < 0.16 else 1.0
-                pop_ease = 1.0 - (1.0 - pop) ** 3
+                    # Foreground table + coffee cup right in front of sitting character for natural depth!
+                    if idx_c == len(characters) - 1 and fg_furniture:
+                        for asset, ox, oy, ow, oh, color in fg_furniture:
+                            self.assets.render_asset_aa(img, asset, ox, oy, ow, oh, color, t=t)
 
-                speech = VisualTextSanitizer.sanitize_bubble_text(char.get("speech", ""), kind="speech")
-                if speech and pop_ease > 0.20:
-                    lines = textwrap.wrap(speech, width=20)
-                    max_len = max(len(ln) for ln in lines) if lines else 1
-                    bw = max(int(150 * res_scale), int(min((max_len * 13 + 52) * res_scale, self.width * 0.58) * pop_ease))
-                    bh = max(int(54 * res_scale), int(max((len(lines) * 26 + 42) * res_scale, self.height // 9) * pop_ease))
-                    bx = max(16, min(int(px) - bw // 2, self.width - bw - 16))
-                    by = max(16, min(int(py) - int(116 * scale) - bh, self.height - bh - 16))
-                    bubble_key = "SPEECH_BUBBLE"
-                    self._render_bubble_aa(img, bubble_key, bx, by, bw, bh, speech if pop_ease > 0.45 else "")
+                    # Contextual Speech & Thought Bubbles (smooth spring pop-in, text readable once open)
+                    pop = min(1.0, t / 0.16) if t < 0.16 else 1.0
+                    pop_ease = 1.0 - (1.0 - pop) ** 3
 
-                thought = VisualTextSanitizer.sanitize_bubble_text(char.get("thought", ""), kind="thought")
-                if thought and pop_ease > 0.20:
-                    lines = textwrap.wrap(thought, width=20)
-                    max_len = max(len(ln) for ln in lines) if lines else 1
-                    bw = max(int(150 * res_scale), int(min((max_len * 13 + 52) * res_scale, self.width * 0.58) * pop_ease))
-                    bh = max(int(54 * res_scale), int(max((len(lines) * 26 + 42) * res_scale, self.height // 9) * pop_ease))
+                    speech = VisualTextSanitizer.sanitize_bubble_text(char.get("speech", ""), kind="speech")
+                    if speech and pop_ease > 0.20:
+                        lines = textwrap.wrap(speech, width=20)
+                        max_len = max(len(ln) for ln in lines) if lines else 1
+                        bw = max(int(150 * res_scale), int(min((max_len * 13 + 52) * res_scale, self.width * 0.58) * pop_ease))
+                        bh = max(int(54 * res_scale), int(max((len(lines) * 26 + 42) * res_scale, self.height // 9) * pop_ease))
+                        bx = max(16, min(int(px) - bw // 2, self.width - bw - 16))
+                        by = max(16, min(int(py) - int(116 * scale) - bh, self.height - bh - 16))
+                        bubble_key = "SPEECH_BUBBLE"
+                        self._render_bubble_aa(img, bubble_key, bx, by, bw, bh, speech if pop_ease > 0.45 else "")
 
-                    thought_img = None
-                    if getattr(self, "use_lcm", False):
-                        try:
-                            from engine.lcm_image_engine import LCMImageEngine
-                            tw = max(96, bw - 24)
-                            th = max(64, int(bh * 0.70) - 16)
-                            thought_img = LCMImageEngine.render_thought_illustration(thought, width=tw, height=th)
-                            if thought_img is not None:
-                                bh = max(bh, int(140 * res_scale * pop_ease))
-                        except Exception:
-                            pass
+                    thought = VisualTextSanitizer.sanitize_bubble_text(char.get("thought", ""), kind="thought")
+                    if thought and pop_ease > 0.20:
+                        lines = textwrap.wrap(thought, width=20)
+                        max_len = max(len(ln) for ln in lines) if lines else 1
+                        bw = max(int(150 * res_scale), int(min((max_len * 13 + 52) * res_scale, self.width * 0.58) * pop_ease))
+                        bh = max(int(54 * res_scale), int(max((len(lines) * 26 + 42) * res_scale, self.height // 9) * pop_ease))
 
-                    bx = max(16, min(int(px) - bw // 2, self.width - bw - 16))
-                    by = max(16, min(int(py) - int(116 * scale) - bh, self.height - bh - 16))
-                    self._render_bubble_aa(
-                        img, "THOUGHT_BUBBLE", bx, by, bw, bh,
-                        text=thought if (thought_img is None and pop_ease > 0.45) else "",
-                        thought_img=thought_img if pop_ease > 0.45 else None
-                    )
+                        thought_img = None
+                        if getattr(self, "use_lcm", False):
+                            try:
+                                from engine.lcm_image_engine import LCMImageEngine
+                                tw = max(96, bw - 24)
+                                th = max(64, int(bh * 0.70) - 16)
+                                thought_img = LCMImageEngine.render_thought_illustration(thought, width=tw, height=th)
+                                if thought_img is not None:
+                                    bh = max(bh, int(140 * res_scale * pop_ease))
+                            except Exception:
+                                pass
+
+                        bx = max(16, min(int(px) - bw // 2, self.width - bw - 16))
+                        by = max(16, min(int(py) - int(116 * scale) - bh, self.height - bh - 16))
+                        self._render_bubble_aa(
+                            img, "THOUGHT_BUBBLE", bx, by, bw, bh,
+                            text=thought if (thought_img is None and pop_ease > 0.45) else "",
+                            thought_img=thought_img if pop_ease > 0.45 else None
+                        )
 
             # 3. Camera motion (dynamic zoom/pan with subtle breathing drift on MEDIUM)
             img = self._apply_camera(img, camera, t)
 
             # 4. Style-native dynamic atmosphere + lighting overlays (A3, A4, A6, B3, B4)
-            img = self._apply_style_atmosphere(img, time_sec, t, scene_id)
+            img = self._apply_style_atmosphere(img, time_sec, t, scene_id, emotion=scene.get("emotion", ""))
 
             # 5. Atmosphere and Lighting Overlays (clean, uncluttered - top headline banners disabled)
             if self.sp.get("presenter_pip"):
@@ -360,6 +380,584 @@ class SceneComposer:
                 img = self._apply_single_transition(img, trans_out, rem, at_start=False, frame_idx=f)
 
             yield img
+
+    # ------------------------------------------------------------------
+    # Visual Layout Archetype Renderers (High-Impact Storytelling)
+    # ------------------------------------------------------------------
+
+    def _render_split_screen(
+        self,
+        img: Image.Image,
+        scene: dict[str, Any],
+        t: float,
+        time_sec: float,
+        res_scale: float,
+        floor_y: int,
+    ) -> None:
+        """
+        Renders a dynamic Split-Screen Comparison layout:
+        Left (The 99% Trap / Problem) vs Right (The 1% Breakthrough / Solution)
+        with vertical divider, 'VS' pop-in stamp, and contrasting characters.
+        """
+        w, h = self.width, self.height
+        cx = w // 2
+        arch_data = scene.get("archetype_data") or {}
+
+        # 1. Left & Right contrasting tonal overlays
+        ov = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        d = ImageDraw.Draw(ov)
+        d.rectangle([0, 0, cx, h], fill=(15, 23, 42, 160))
+        d.rectangle([cx, 0, w, h], fill=(6, 78, 59, 130))
+
+        # Vertical divider line down screen center
+        div_w = max(2, int(3 * res_scale))
+        d.line([(cx, 0), (cx, h)], fill=(255, 255, 255, 200), width=div_w)
+        d.line([(cx - 1, 0), (cx - 1, h)], fill=(0, 0, 0, 100), width=1)
+        img.alpha_composite(ov)
+
+        # 2. Dynamic Center "VS" Stamp
+        pop = self._spring_pop(min(1.0, t / 0.20))
+        if pop > 0.05:
+            vs_r = max(18, int(28 * res_scale * pop))
+            vs_cy = int(h * 0.48)
+            vs_ov = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            vd = ImageDraw.Draw(vs_ov)
+            vd.ellipse([cx - vs_r - 3, vs_cy - vs_r - 3, cx + vs_r + 3, vs_cy + vs_r + 3], fill=(245, 158, 11, 230))
+            vd.ellipse([cx - vs_r, vs_cy - vs_r, cx + vs_r, vs_cy + vs_r], fill=(15, 23, 42, 240), outline=(255, 255, 255, 220), width=max(1, int(2 * res_scale)))
+            font_vs = _load_ui_font(max(11, int(18 * res_scale * pop)), bold=True)
+            vs_lbl = str(arch_data.get("vs_label", "VS"))
+            bbox = vd.textbbox((0, 0), vs_lbl, font=font_vs)
+            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            vd.text((cx - tw // 2, vs_cy - th // 2 - 2), vs_lbl, fill=(245, 158, 11, 255), font=font_vs)
+            img.alpha_composite(vs_ov)
+
+        # 3. Header Badges / Pill strips
+        draw = ImageDraw.Draw(img)
+        font_hdr = _load_ui_font(max(11, int(15 * res_scale)), bold=True)
+
+        left_title = str(arch_data.get("left_title", "THE 99% TRAP"))
+        right_title = str(arch_data.get("right_title", "THE 1% SOLUTION"))
+
+        # Left Header Pill
+        lx = cx // 2
+        ly = int(h * 0.16)
+        max_pill_w = int(cx * 0.82)
+        l_box = draw.textbbox((0, 0), left_title, font=font_hdr)
+        lw, lh = l_box[2] - l_box[0], l_box[3] - l_box[1]
+        if lw > max_pill_w:
+            font_hdr_l = _load_ui_font(max(9, int(font_hdr.size * (max_pill_w / max(1, lw)))), bold=True)
+            l_box = draw.textbbox((0, 0), left_title, font=font_hdr_l)
+            lw, lh = l_box[2] - l_box[0], l_box[3] - l_box[1]
+        else:
+            font_hdr_l = font_hdr
+        pad_x, pad_y = int(14 * res_scale), int(6 * res_scale)
+        draw.rounded_rectangle([lx - lw // 2 - pad_x, ly - pad_y, lx + lw // 2 + pad_x, ly + lh + pad_y], radius=max(6, int(8 * res_scale)), fill=(239, 68, 68, 220), outline=(255, 255, 255, 180), width=1)
+        draw.text((lx, ly + lh // 2), left_title, fill=(255, 255, 255, 255), font=font_hdr_l, anchor="mm")
+
+        # Right Header Pill
+        rx = cx + cx // 2
+        ry = int(h * 0.16)
+        r_box = draw.textbbox((0, 0), right_title, font=font_hdr)
+        rw, rh = r_box[2] - r_box[0], r_box[3] - r_box[1]
+        if rw > max_pill_w:
+            font_hdr_r = _load_ui_font(max(9, int(font_hdr.size * (max_pill_w / max(1, rw)))), bold=True)
+            r_box = draw.textbbox((0, 0), right_title, font=font_hdr_r)
+            rw, rh = r_box[2] - r_box[0], r_box[3] - r_box[1]
+        else:
+            font_hdr_r = font_hdr
+        draw.rounded_rectangle([rx - rw // 2 - pad_x, ry - pad_y, rx + rw // 2 + pad_x, ry + rh + pad_y], radius=max(6, int(8 * res_scale)), fill=(16, 185, 129, 220), outline=(255, 255, 255, 180), width=1)
+        draw.text((rx, ry + rh // 2), right_title, fill=(255, 255, 255, 255), font=font_hdr_r, anchor="mm")
+
+        # 4. Characters Staged on Both Sides
+        left_act = str(arch_data.get("left_action", "HEADACHE_STRESS")).upper()
+        right_act = str(arch_data.get("right_action", "TRIUMPH_FIST")).upper()
+        left_col = str(arch_data.get("left_color", "#EF4444"))
+        right_col = str(arch_data.get("right_color", "#10B981"))
+        char_scale = 1.18 * res_scale
+
+        self.renderer.render_character_on_frame(
+            img,
+            int(cx * 0.48),
+            int(floor_y),
+            pose=left_act,
+            scale=char_scale,
+            facing="right",
+            color_override=left_col,
+            emotion_override="SAD",
+            time_sec=time_sec,
+        )
+
+        self.renderer.render_character_on_frame(
+            img,
+            int(cx + cx * 0.52),
+            int(floor_y),
+            pose=right_act,
+            scale=char_scale,
+            facing="left",
+            color_override=right_col,
+            emotion_override="EXCITED",
+            time_sec=time_sec,
+        )
+
+    def _render_fullscreen_infographic(
+        self,
+        img: Image.Image,
+        scene: dict[str, Any],
+        t: float,
+        time_sec: float,
+        res_scale: float,
+        floor_y: int,
+    ) -> None:
+        """
+        Renders an oversized, animated infographic taking center stage:
+        - EXPONENTIAL_CURVE: Coordinate grid + upward hockey stick curve + metric stamp
+        - BALANCE_SCALE: Animated tilting fulcrum weighing pain vs massive payoff
+        - ICEBERG_DEPTH: 10% visible surface tip vs massive 90% underwater ice mountain
+        - RADIAL_PERCENT: Giant glowing progress ring with center metric counter
+        - HIERARCHY_PYRAMID: 3-layer tiered pyramid lighting up tier-by-tier
+        """
+        w, h = self.width, self.height
+        arch_data = scene.get("archetype_data") or {}
+        info_type = str(arch_data.get("infographic_type", "EXPONENTIAL_CURVE")).upper()
+        title = str(arch_data.get("title", "THE POWER OF COMPOUNDING"))
+
+        draw = ImageDraw.Draw(img)
+        font_hdr = _load_ui_font(max(13, int(18 * res_scale)), bold=True)
+        font_metric = _load_ui_font(max(16, int(32 * res_scale)), bold=True)
+        font_sub = _load_ui_font(max(10, int(13 * res_scale)), bold=False)
+
+        # 1. Top Header Banner
+        tx, ty = w // 2, int(h * 0.12)
+        max_banner_w = int(w * 0.82)
+        t_box = draw.textbbox((0, 0), title, font=font_hdr)
+        tw, th = t_box[2] - t_box[0], t_box[3] - t_box[1]
+        if tw > max_banner_w:
+            font_hdr = _load_ui_font(max(9, int(font_hdr.size * (max_banner_w / max(1, tw)))), bold=True)
+            t_box = draw.textbbox((0, 0), title, font=font_hdr)
+            tw, th = t_box[2] - t_box[0], t_box[3] - t_box[1]
+        pad_x, pad_y = int(18 * res_scale), int(8 * res_scale)
+        draw.rounded_rectangle([tx - tw // 2 - pad_x, ty - pad_y, tx + tw // 2 + pad_x, ty + th + pad_y], radius=max(6, int(10 * res_scale)), fill=(15, 23, 42, 220), outline=(56, 189, 248, 200), width=1)
+        draw.text((tx, ty + th // 2), title, fill=(248, 250, 252, 255), font=font_hdr, anchor="mm")
+
+        # 2. Presenter Character on Left Side
+        char_scale = 1.15 * res_scale
+        px = int(w * 0.16)
+        self.renderer.render_character_on_frame(
+            img,
+            px,
+            floor_y,
+            pose="PRESENT_CHART",
+            scale=char_scale,
+            facing="right",
+            color_override="#38BDF8",
+            time_sec=time_sec,
+        )
+
+        # 3. Dedicated Infographic Visuals
+        if info_type == "ICEBERG_DEPTH":
+            y_surf = int(h * 0.38)
+            water_ov = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            wd = ImageDraw.Draw(water_ov)
+            wd.rectangle([0, y_surf, w, h], fill=(8, 47, 73, 220))
+            ice_pts = [
+                (int(w * 0.50), y_surf),
+                (int(w * 0.85), int(y_surf + (h - y_surf) * 0.35)),
+                (int(w * 0.78), int(h * 0.92)),
+                (int(w * 0.44), int(h * 0.94)),
+                (int(w * 0.35), int(y_surf + (h - y_surf) * 0.45)),
+            ]
+            wd.polygon(ice_pts, fill=(14, 116, 144, 210), outline=(56, 189, 248, 240))
+            img.alpha_composite(water_ov)
+
+            draw.polygon([(int(w * 0.48), y_surf), (int(w * 0.54), int(y_surf - h * 0.14)), (int(w * 0.62), y_surf)], fill=(241, 245, 249, 250), outline=(148, 163, 184, 255))
+            draw.line([(0, y_surf), (w, y_surf)], fill=(56, 189, 248, 230), width=max(2, int(3 * res_scale)))
+
+            draw.text((int(w * 0.64), int(y_surf - h * 0.10)), "WHAT PEOPLE SEE (10%)", fill=(255, 255, 255, 240), font=font_sub)
+            draw.text((int(w * 0.48), int(y_surf + h * 0.16)), "UNSEEN EFFORT (90%)", fill=(56, 189, 248, 255), font=font_hdr)
+            draw.text((int(w * 0.48), int(y_surf + h * 0.26)), "YEARS OF DISCIPLINE & FAILURE", fill=(203, 213, 225, 220), font=font_sub)
+
+        elif info_type == "BALANCE_SCALE":
+            cx_scale = int(w * 0.60)
+            pivot_y = int(h * 0.44)
+            tilt = math.sin(t * math.pi * 1.5) * 12.0
+            beam_half = int(w * 0.22)
+            rad = math.radians(tilt)
+            bx1 = cx_scale - int(beam_half * math.cos(rad))
+            by1 = pivot_y - int(beam_half * math.sin(rad))
+            bx2 = cx_scale + int(beam_half * math.cos(rad))
+            by2 = pivot_y + int(beam_half * math.sin(rad))
+
+            draw.polygon([(cx_scale - 16, floor_y), (cx_scale + 16, floor_y), (cx_scale + 4, pivot_y), (cx_scale - 4, pivot_y)], fill=(148, 163, 184, 240))
+            draw.ellipse([cx_scale - 8, pivot_y - 8, cx_scale + 8, pivot_y + 8], fill=(245, 158, 11, 255))
+            draw.line([(bx1, by1), (bx2, by2)], fill=(248, 250, 252, 255), width=max(3, int(4 * res_scale)))
+
+            cable_len = int(h * 0.16)
+            draw.line([(bx1, by1), (bx1 - 18, by1 + cable_len)], fill=(148, 163, 184, 200), width=1)
+            draw.line([(bx1, by1), (bx1 + 18, by1 + cable_len)], fill=(148, 163, 184, 200), width=1)
+            draw.arc([bx1 - 26, by1 + cable_len - 10, bx1 + 26, by1 + cable_len + 14], start=0, end=180, fill=(239, 68, 68, 255), width=3)
+            draw.text((bx1 - 32, by1 + cable_len + 16), "SHORT TERM", fill=(239, 68, 68, 240), font=font_sub)
+
+            draw.line([(bx2, by2), (bx2 - 18, by2 + cable_len)], fill=(148, 163, 184, 200), width=1)
+            draw.line([(bx2, by2), (bx2 + 18, by2 + cable_len)], fill=(148, 163, 184, 200), width=1)
+            draw.arc([bx2 - 26, by2 + cable_len - 10, bx2 + 26, by2 + cable_len + 14], start=0, end=180, fill=(16, 185, 129, 255), width=3)
+            draw.text((bx2 - 36, by2 + cable_len + 16), "COMPOUND ROI", fill=(16, 185, 129, 240), font=font_sub)
+
+        else:
+            # Default EXPONENTIAL_CURVE / Hockey Stick
+            gx0 = int(w * 0.32)
+            gy0 = int(h * 0.24)
+            gx1 = int(w * 0.90)
+            gy1 = int(floor_y - 10)
+
+            draw.line([(gx0, gy1), (gx1, gy1)], fill=(148, 163, 184, 180), width=max(1, int(2 * res_scale)))
+            draw.line([(gx0, gy0), (gx0, gy1)], fill=(148, 163, 184, 180), width=max(1, int(2 * res_scale)))
+            draw.text((gx1 - 40, gy1 + 6), "TIME", fill=(148, 163, 184, 200), font=font_sub)
+            draw.text((gx0 - 15, gy0 - 18), "RESULTS", fill=(148, 163, 184, 200), font=font_sub)
+
+            pts: list[tuple[int, int]] = []
+            steps = 40
+            prog = min(1.0, t * 1.25)
+            max_steps = max(2, int(steps * prog))
+            for i in range(max_steps + 1):
+                frac = i / steps
+                cx_pt = int(gx0 + (gx1 - gx0) * frac)
+                y_norm = (math.exp(frac * 3.2) - 1.0) / (math.exp(3.2) - 1.0)
+                cy_pt = int(gy1 - (gy1 - gy0) * y_norm)
+                pts.append((cx_pt, cy_pt))
+
+            if len(pts) >= 2:
+                draw.line(pts, fill=(245, 158, 11, 255), width=max(3, int(5 * res_scale)))
+                tip_x, tip_y = pts[-1]
+                draw.ellipse([tip_x - 6, tip_y - 6, tip_x + 6, tip_y + 6], fill=(255, 255, 255, 255))
+                metric_str = str(arch_data.get("metric", "+1,000%"))
+                draw.text((tip_x - 55, tip_y - 35), metric_str, fill=(245, 158, 11, 255), font=font_metric)
+
+    def _render_herd_rebel(
+        self,
+        img: Image.Image,
+        scene: dict[str, Any],
+        t: float,
+        time_sec: float,
+        res_scale: float,
+        floor_y: int,
+    ) -> None:
+        """
+        Renders the Crowd Conformity vs Rebel Solitude layout:
+        A background row of 4-5 semi-transparent silhouette stickmen marching right in lockstep,
+        while our Hero Stickman (in full vibrant color & overhead spotlight) breaks away in the opposite direction.
+        """
+        w, h = self.width, self.height
+        arch_data = scene.get("archetype_data") or {}
+
+        draw = ImageDraw.Draw(img)
+        font_hdr = _load_ui_font(max(11, int(15 * res_scale)), bold=True)
+        font_sub = _load_ui_font(max(10, int(12 * res_scale)), bold=False)
+
+        # 1. Background Herd (Walking right in unison, muted slate)
+        x_fracs = [0.42, 0.54, 0.66, 0.78, 0.90]
+        herd_scale = 1.06 * res_scale
+        for xf in x_fracs:
+            hx = int((xf + (t * 0.08)) * w) % int(w * 0.96)
+            if hx < int(w * 0.36):
+                hx += int(w * 0.60)
+            self.renderer.render_character_on_frame(
+                img,
+                hx,
+                floor_y,
+                pose="WALK_RIGHT",
+                scale=herd_scale,
+                facing="right",
+                color_override="#64748B",
+                time_sec=time_sec,
+            )
+
+        # Label above herd
+        crowd_lbl = str(arch_data.get("crowd_label", "THE 99%: FOLLOWING THE HERD"))
+        draw.text((int(w * 0.52), int(h * 0.16)), crowd_lbl, fill=(148, 163, 184, 220), font=font_sub)
+
+        # 2. Hero Rebel (Walking Left or Standing Tall in Sunlight Beam)
+        hero_x = int(w * 0.22)
+        hero_scale = 1.28 * res_scale
+        hero_act = str(arch_data.get("hero_action", "WALK_LEFT")).upper()
+
+        # Overhead Spotlight Beam
+        beam_ov = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(beam_ov)
+        bd.polygon([(0, 0), (int(w * 0.10), 0), (hero_x + 60, floor_y + 15), (hero_x - 60, floor_y + 15)], fill=(255, 251, 235, 45))
+        img.alpha_composite(beam_ov)
+
+        # Rebel Hero character
+        self.renderer.render_character_on_frame(
+            img,
+            hero_x,
+            floor_y,
+            pose=hero_act,
+            scale=hero_scale,
+            facing="left",
+            color_override="#38BDF8",
+            time_sec=time_sec,
+        )
+
+        # Rebel Badge
+        hero_lbl = str(arch_data.get("hero_label", "THE 1%: WALKING ALONE"))
+        h_box = draw.textbbox((0, 0), hero_lbl, font=font_hdr)
+        hw, hh = h_box[2] - h_box[0], h_box[3] - h_box[1]
+        badge_cx = max(hw // 2 + 16, min(w - hw // 2 - 16, hero_x))
+        draw.rounded_rectangle([badge_cx - hw // 2 - 10, int(h * 0.16) - 5, badge_cx + hw // 2 + 10, int(h * 0.16) + hh + 5], radius=6, fill=(15, 23, 42, 220), outline=(56, 189, 248, 220), width=1)
+        draw.text((badge_cx - hw // 2, int(h * 0.16)), hero_lbl, fill=(56, 189, 248, 255), font=font_hdr)
+
+    def _render_scale_contrast(
+        self,
+        img: Image.Image,
+        scene: dict[str, Any],
+        t: float,
+        time_sec: float,
+        res_scale: float,
+        floor_y: int,
+    ) -> None:
+        """
+        Renders a dramatic Scale Contrast layout (David vs Goliath / Monolith):
+        A tiny stickman (scale ~0.55) dwarfed by a colossal atmospheric landmark
+        (Giant Clock or Towering Mountain Monolith).
+        """
+        w, h = self.width, self.height
+        arch_data = scene.get("archetype_data") or {}
+        colossal_type = str(arch_data.get("colossal_type", "GIANT_CLOCK")).upper()
+
+        draw = ImageDraw.Draw(img)
+        font_hdr = _load_ui_font(max(12, int(16 * res_scale)), bold=True)
+
+        if colossal_type == "GIANT_CLOCK":
+            cx_clk = int(w * 0.68)
+            cy_clk = int(h * 0.44)
+            r_clk = int(h * 0.36)
+
+            draw.ellipse([cx_clk - r_clk, cy_clk - r_clk, cx_clk + r_clk, cy_clk + r_clk], fill=(15, 23, 42, 230), outline=(245, 158, 11, 240), width=max(3, int(4 * res_scale)))
+            for deg in range(0, 360, 30):
+                rad = math.radians(deg)
+                x1 = cx_clk + int((r_clk - 18) * math.cos(rad))
+                y1 = cy_clk + int((r_clk - 18) * math.sin(rad))
+                x2 = cx_clk + int((r_clk - 4) * math.cos(rad))
+                y2 = cy_clk + int((r_clk - 4) * math.sin(rad))
+                draw.line([(x1, y1), (x2, y2)], fill=(245, 158, 11, 200), width=max(2, int(2 * res_scale)))
+
+            sec_deg = (time_sec * 45.0) % 360
+            sec_rad = math.radians(sec_deg - 90)
+            draw.line([(cx_clk, cy_clk), (cx_clk + int((r_clk - 24) * math.cos(sec_rad)), cy_clk + int((r_clk - 24) * math.sin(sec_rad)))], fill=(239, 68, 68, 240), width=max(2, int(2 * res_scale)))
+            draw.ellipse([cx_clk - 6, cy_clk - 6, cx_clk + 6, cy_clk + 6], fill=(255, 255, 255, 255))
+        else:
+            pts = [(int(w * 0.35), floor_y), (int(w * 0.72), int(h * 0.10)), (w, floor_y)]
+            draw.polygon(pts, fill=(30, 41, 59, 240), outline=(148, 163, 184, 220))
+            draw.ellipse([int(w * 0.72) - 8, int(h * 0.10) - 8, int(w * 0.72) + 8, int(h * 0.10) + 8], fill=(245, 158, 11, 255))
+
+        tiny_scale = 0.56 * res_scale
+        hx = int(w * 0.20)
+        self.renderer.render_character_on_frame(
+            img,
+            hx,
+            floor_y,
+            pose="POINT_UP",
+            scale=tiny_scale,
+            facing="right",
+            color_override="#38BDF8",
+            time_sec=time_sec,
+        )
+
+        title = str(arch_data.get("title", "TIME IS RUNNING OUT"))
+        t_sz = max(14, int(22 * res_scale))
+        font_t = _load_ui_font(t_sz, bold=True)
+        max_tw = int(w * 0.80)
+        try:
+            ttw = int(font_t.getlength(title))
+        except Exception:
+            ttw = len(title) * 11
+        while ttw > max_tw and t_sz > 11:
+            t_sz -= 1
+            font_t = _load_ui_font(t_sz, bold=True)
+            try:
+                ttw = int(font_t.getlength(title))
+            except Exception:
+                ttw = len(title) * 8
+        draw.text((int(w * 0.10), int(h * 0.14)), title, fill=(248, 250, 252, 240), font=font_t)
+
+    def _render_hero_prop_mechanic(
+        self,
+        img: Image.Image,
+        scene: dict[str, Any],
+        t: float,
+        time_sec: float,
+        res_scale: float,
+        floor_y: int,
+    ) -> None:
+        """
+        Renders physical stickman-to-prop mechanics (not just floating icons):
+        - HAMSTER_WHEEL: Character is physically inside the rotating wheel running in place!
+        - PUSH_BOULDER: Character leaning hard uphill pushing a massive round rock
+        - PUPPET_STRINGS: Marionette crossbar with strings tied to character's limbs
+        """
+        w, h = self.width, self.height
+        arch_data = scene.get("archetype_data") or {}
+        mech_type = str(arch_data.get("mechanic_type", "HAMSTER_WHEEL")).upper()
+
+        draw = ImageDraw.Draw(img)
+        font_hdr = _load_ui_font(max(12, int(16 * res_scale)), bold=True)
+
+        if mech_type == "HAMSTER_WHEEL":
+            cx_w = int(w * 0.50)
+            r_w = int(h * 0.25)
+            cy_w = floor_y - r_w + 6
+
+            draw.line([(cx_w, cy_w), (cx_w - 40, floor_y)], fill=(148, 163, 184, 220), width=3)
+            draw.line([(cx_w, cy_w), (cx_w + 40, floor_y)], fill=(148, 163, 184, 220), width=3)
+
+            rot_deg = time_sec * 120.0
+            for deg in range(0, 360, 45):
+                rad = math.radians(deg + rot_deg)
+                sx = cx_w + int(r_w * math.cos(rad))
+                sy = cy_w + int(r_w * math.sin(rad))
+                draw.line([(cx_w, cy_w), (sx, sy)], fill=(100, 116, 139, 140), width=2)
+
+            draw.ellipse([cx_w - r_w, cy_w - r_w, cx_w + r_w, cy_w + r_w], outline=(245, 158, 11, 240), width=max(3, int(4 * res_scale)))
+
+            self.renderer.render_character_on_frame(
+                img,
+                cx_w,
+                floor_y - 12,
+                pose="SPRINT_FAST",
+                scale=1.04 * res_scale,
+                facing="right",
+                color_override="#38BDF8",
+                time_sec=time_sec,
+            )
+
+        elif mech_type == "PUSH_BOULDER":
+            draw.polygon([(0, floor_y + 40), (w, floor_y - int(h * 0.22)), (w, h), (0, h)], fill=(30, 41, 59, 230))
+            bx = int(w * 0.56)
+            by = floor_y - int(h * 0.12)
+            br = int(h * 0.16)
+            draw.ellipse([bx - br, by - br, bx + br, by + br], fill=(71, 85, 105, 255), outline=(148, 163, 184, 240), width=3)
+
+            self.renderer.render_character_on_frame(
+                img,
+                bx - br - 12,
+                floor_y + 12,
+                pose="SPRINT_FAST",
+                scale=1.12 * res_scale,
+                facing="right",
+                color_override="#38BDF8",
+                time_sec=time_sec,
+            )
+        else:
+            cx = w // 2
+            draw.line([(cx - 70, int(h * 0.12)), (cx + 70, int(h * 0.12))], fill=(245, 158, 11, 240), width=5)
+            self.renderer.render_character_on_frame(
+                img,
+                cx,
+                floor_y,
+                pose="SHRUG",
+                scale=1.20 * res_scale,
+                facing="right",
+                color_override="#38BDF8",
+                time_sec=time_sec,
+            )
+            draw.line([(cx - 50, int(h * 0.12)), (cx - 20, int(floor_y - 50))], fill=(255, 255, 255, 120), width=1)
+            draw.line([(cx + 50, int(h * 0.12)), (cx + 20, int(floor_y - 50))], fill=(255, 255, 255, 120), width=1)
+
+        title = str(arch_data.get("title", "THE NEVER-ENDING STRUGGLE"))
+        t_sz = max(14, int(22 * res_scale))
+        font_t = _load_ui_font(t_sz, bold=True)
+        max_tw = int(w * 0.78)
+        try:
+            ttw = int(font_t.getlength(title))
+        except Exception:
+            ttw = len(title) * 11
+        while ttw > max_tw and t_sz > 11:
+            t_sz -= 1
+            font_t = _load_ui_font(t_sz, bold=True)
+            try:
+                ttw = int(font_t.getlength(title))
+            except Exception:
+                ttw = len(title) * 8
+        draw.text((int(w * 0.12), int(h * 0.14)), title, fill=(248, 250, 252, 240), font=font_t)
+
+    def _render_kinetic_concept_card(
+        self,
+        img: Image.Image,
+        scene: dict[str, Any],
+        t: float,
+        time_sec: float,
+        res_scale: float,
+        floor_y: int,
+    ) -> None:
+        """
+        Renders a bold, modern graphic concept card centered in the upper-mid screen,
+        with stickman pointing or presenting to the side.
+        """
+        w, h = self.width, self.height
+        arch_data = scene.get("archetype_data") or {}
+
+        bx = int(w * 0.32)
+        by = int(h * 0.22)
+        bw = int(w * 0.60)
+        bh = int(h * 0.40)
+
+        card_ov = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        cd = ImageDraw.Draw(card_ov)
+        cd.rounded_rectangle([bx, by, bx + bw, by + bh], radius=max(8, int(14 * res_scale)), fill=(15, 23, 42, 230), outline=(56, 189, 248, 240), width=max(1, int(2 * res_scale)))
+        cd.line([(bx + 14, by), (bx + bw - 14, by)], fill=(245, 158, 11, 255), width=max(2, int(3 * res_scale)))
+
+        max_card_text_w = bw - 44
+        badge_txt = str(arch_data.get("badge", "THE GOLDEN RULE"))
+        title_txt = str(arch_data.get("title", "THE 1% COMPOUND RULE"))
+        sub_txt = str(arch_data.get("subtitle", "Daily Compounding Beats Irregular Intensity"))
+
+        # Fit badge text
+        font_badge = _load_ui_font(max(10, int(12 * res_scale)), bold=True)
+        # Fit title text
+        title_sz = max(14, int(22 * res_scale))
+        font_title = _load_ui_font(title_sz, bold=True)
+        try:
+            ttw = int(font_title.getlength(title_txt))
+        except Exception:
+            ttw = len(title_txt) * 12
+        while ttw > max_card_text_w and title_sz > 11:
+            title_sz -= 1
+            font_title = _load_ui_font(title_sz, bold=True)
+            try:
+                ttw = int(font_title.getlength(title_txt))
+            except Exception:
+                ttw = len(title_txt) * 8
+
+        # Fit subtitle text (wrap if needed)
+        sub_sz = max(10, int(13 * res_scale))
+        font_sub = _load_ui_font(sub_sz, bold=False)
+        try:
+            stw = int(font_sub.getlength(sub_txt))
+        except Exception:
+            stw = len(sub_txt) * 8
+        while stw > max_card_text_w and sub_sz > 9:
+            sub_sz -= 1
+            font_sub = _load_ui_font(sub_sz, bold=False)
+            try:
+                stw = int(font_sub.getlength(sub_txt))
+            except Exception:
+                stw = len(sub_txt) * 6
+
+        cd.text((bx + 22, by + 18), badge_txt, fill=(245, 158, 11, 255), font=font_badge)
+        cd.text((bx + 22, by + 46), title_txt, fill=(248, 250, 252, 255), font=font_title)
+        cd.text((bx + 22, by + 86), sub_txt, fill=(148, 163, 184, 220), font=font_sub)
+        img.alpha_composite(card_ov)
+
+        self.renderer.render_character_on_frame(
+            img,
+            int(w * 0.16),
+            floor_y,
+            pose="POINT_RIGHT",
+            scale=1.24 * res_scale,
+            facing="right",
+            color_override="#38BDF8",
+            time_sec=time_sec,
+        )
 
     # ------------------------------------------------------------------
     # 2x AA Prop & Bubble Helpers
@@ -470,7 +1068,7 @@ class SceneComposer:
         text: str,
         thought_img: Optional[Image.Image] = None,
     ) -> None:
-        pad = 14
+        pad = 28
         aa = 2
         spr = Image.new("RGBA", ((w + pad * 2) * aa, (h + pad * 2) * aa), (0, 0, 0, 0))
         d = ImageDraw.Draw(spr)
@@ -503,6 +1101,7 @@ class SceneComposer:
         time_sec: float,
         t: float,
         scene_id: int,
+        emotion: str = "",
     ) -> Image.Image:
         sid = self.pack.id
         w, h = frame.size
@@ -574,6 +1173,22 @@ class SceneComposer:
         vignette_s = float(self.sp.get("vignette_strength", 0.0))
         if vignette_s > 0.05:
             frame = self._add_vignette(frame, vignette_s)
+
+        # Adaptive Mood Lighting & Emotional Color Grading
+        emo_u = (emotion or "").upper()
+        if emo_u in ("TRIUMPH", "HAPPY", "JOY", "EXCITED", "CONFIDENT"):
+            wash = Image.new("RGBA", (w, h), (255, 195, 75, 15))
+            frame = Image.alpha_composite(frame.convert("RGBA"), wash)
+        elif emo_u in ("SAD", "STRESSED", "STRUGGLE", "DEPRESSED", "FEAR", "TIRED"):
+            wash = Image.new("RGBA", (w, h), (15, 23, 42, 22))
+            frame = Image.alpha_composite(frame.convert("RGBA"), wash)
+        elif emo_u in ("SHOCK", "WARNING", "ALERT", "ANGRY", "DANGER"):
+            wash = Image.new("RGBA", (w, h), (239, 68, 68, 18))
+            frame = Image.alpha_composite(frame.convert("RGBA"), wash)
+        elif emo_u in ("CALM", "STOIC", "CONTEMPLATIVE", "ZEN"):
+            wash = Image.new("RGBA", (w, h), (16, 185, 129, 12))
+            frame = Image.alpha_composite(frame.convert("RGBA"), wash)
+
         return frame
 
     def _draw_headline_banner(self, frame: Image.Image, text: str, t: float) -> None:
@@ -583,13 +1198,36 @@ class SceneComposer:
         ease = 1.0 - (1.0 - ease) ** 3
         if ease < 0.1 or not text:
             return
-        font = _load_ui_font(max(15, min(w, h) // 24), bold=True)
         draw = ImageDraw.Draw(frame)
+        target_f_sz = max(15, min(w, h) // 24)
+        max_pw = int(w * 0.84)
+        available_text_w = max_pw - 40
+        f_sz = target_f_sz
+        font = _load_ui_font(f_sz, bold=True)
         try:
             tw = int(font.getlength(text))
         except Exception:
             tw = len(text) * 12
-        pw = min(int(w * 0.84), tw + 36)
+
+        while tw > available_text_w and f_sz > 11:
+            f_sz -= 1
+            font = _load_ui_font(f_sz, bold=True)
+            try:
+                tw = int(font.getlength(text))
+            except Exception:
+                tw = len(text) * int(f_sz * 0.6)
+
+        display_text = text
+        if tw > available_text_w:
+            while len(display_text) > 3 and tw > available_text_w:
+                display_text = display_text[:-2]
+                try:
+                    tw = int(font.getlength(display_text + "…"))
+                except Exception:
+                    tw = (len(display_text) + 1) * 10
+            display_text += "…"
+
+        pw = min(max_pw, tw + 40)
         ph = max(32, min(w, h) // 13)
         px = (w - pw) // 2
         py = int(h * 0.075 - (1.0 - ease) * 18)
@@ -599,7 +1237,7 @@ class SceneComposer:
         draw.rounded_rectangle([px, py, px + pw, py + ph], radius=8, fill="#FFFFFF", outline=fg, width=max(2, min(w, h) // 260))
         # Accent left bar indicator
         draw.rounded_rectangle([px, py, px + max(7, pw // 28), py + ph], radius=4, fill=acc)
-        draw.text((px + pw // 2 + 4, py + ph // 2), text, fill=fg, font=font, anchor="mm")
+        draw.text((px + pw // 2 + 4, py + ph // 2), display_text, fill=fg, font=font, anchor="mm")
 
     def _draw_presenter_pip(self, frame: Image.Image, time_sec: float, emotion: str) -> None:
         """Draw recurring charismatic glasses+bowtie Presenter host in framed corner box (B5)."""
@@ -764,21 +1402,33 @@ class SceneComposer:
 
     def _apply_camera(self, frame: Image.Image, camera: str, t: float) -> Image.Image:
         """Apply dynamic camera framing: punch-in, camera shake, slow zoom, pans, dynamic angles."""
-        if camera in ("STATIC",):
+        cam_upper = str(camera or "").upper().strip()
+        if cam_upper in ("DOLLY_IN_SMOOTH", "SLOW_PUSH_IN"):
+            cam_upper = "SLOW_ZOOM_IN"
+        elif cam_upper in ("DOLLY_OUT_WIDE", "SLOW_PULL_OUT"):
+            cam_upper = "SLOW_ZOOM_OUT"
+        elif cam_upper in ("PAN_RIGHT_GLIDE",):
+            cam_upper = "PAN_RIGHT"
+        elif cam_upper in ("PAN_LEFT_GLIDE",):
+            cam_upper = "PAN_LEFT"
+        elif cam_upper in ("PULSE_BEAT",):
+            cam_upper = "DYNAMIC_CUT"
+
+        if cam_upper in ("STATIC",):
             return frame
 
         cx_frac, cy_frac = 0.50, 0.51
         shake_x, shake_y = 0.0, 0.0
         rot_angle = 0.0
 
-        if camera in ("PUNCH_IN", "SNAP_ZOOM"):
+        if cam_upper in ("PUNCH_IN", "SNAP_ZOOM"):
             punch_t = min(1.0, max(0.0, (t - 0.04) / 0.18))
             ease_punch = 1.0 - (1.0 - punch_t) ** 3
             zoom = 1.0 + 0.28 * ease_punch
             cx_frac, cy_frac = 0.50, 0.52
             rot_angle = math.sin(punch_t * math.pi) * 1.5
 
-        elif camera in ("DYNAMIC_CUT", "MULTI_BEAT"):
+        elif cam_upper in ("DYNAMIC_CUT", "MULTI_BEAT"):
             if t < 0.28:
                 zoom = 1.02
                 cx_frac, cy_frac = 0.50, 0.51
@@ -789,12 +1439,12 @@ class SceneComposer:
                 cx_frac, cy_frac = 0.50, 0.52
                 rot_angle = math.sin(punch_t * math.pi) * 1.2
 
-        elif camera in ("OBJECT_FOCUS", "SHOW_OBJECT"):
+        elif cam_upper in ("OBJECT_FOCUS", "SHOW_OBJECT"):
             zoom = 1.04 + 0.20 * self._ease_in_out(t)
             cx_frac = 0.50 + 0.10 * self._ease_in_out(t)
             cy_frac = 0.51 - 0.04 * self._ease_in_out(t)
 
-        elif camera == "CAMERA_SHAKE":
+        elif cam_upper == "CAMERA_SHAKE":
             decay = math.exp(-t * 9.5)
             shake_amp = 18.0 * decay
             shake_x = math.sin(t * math.pi * 32.0) * shake_amp
@@ -803,32 +1453,32 @@ class SceneComposer:
             cx_frac, cy_frac = 0.50, 0.52
             rot_angle = math.sin(t * math.pi * 16.0) * (2.2 * decay)
 
-        elif camera in ("SLOW_ZOOM_IN", "ZOOM_IN"):
+        elif cam_upper in ("SLOW_ZOOM_IN", "ZOOM_IN"):
             zoom = 1.0 + 0.22 * self._ease_in_out(t)
             cx_frac, cy_frac = 0.50, 0.51
 
-        elif camera in ("SLOW_ZOOM_OUT", "ZOOM_OUT"):
+        elif cam_upper in ("SLOW_ZOOM_OUT", "ZOOM_OUT"):
             zoom = 1.25 - 0.22 * self._ease_in_out(t)
             cx_frac, cy_frac = 0.50, 0.51
 
-        elif camera == "PAN_LEFT":
+        elif cam_upper == "PAN_LEFT":
             zoom = 1.15
             cx_frac = 0.58 - 0.16 * self._ease_in_out(t)
             cy_frac = 0.51
             rot_angle = -1.2 * math.sin(t * math.pi)
 
-        elif camera == "PAN_RIGHT":
+        elif cam_upper == "PAN_RIGHT":
             zoom = 1.15
             cx_frac = 0.42 + 0.16 * self._ease_in_out(t)
             cy_frac = 0.51
             rot_angle = 1.2 * math.sin(t * math.pi)
 
-        elif camera in ("CLOSE", "DUTCH_ANGLE"):
+        elif cam_upper in ("CLOSE", "DUTCH_ANGLE"):
             zoom = 1.35 + 0.06 * self._ease_in_out(t)
             cx_frac, cy_frac = 0.50, 0.48
             rot_angle = -2.0 + 1.2 * self._ease_in_out(t)
 
-        elif camera == "WIDE":
+        elif cam_upper == "WIDE":
             zoom = 1.04 - 0.04 * self._ease_in_out(t)
             cx_frac, cy_frac = 0.50, 0.50
 

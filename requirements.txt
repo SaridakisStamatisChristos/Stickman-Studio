@@ -17,14 +17,16 @@ numpy>=1.24.0                     # Audio synthesis, procedural kinematics, DSP
 # ── Progress Reporting ───────────────────────────────────────────────────────
 tqdm>=4.65.0                      # CLI progress reporting
 
-# ── Audio Processing & Neural TTS ───────────────────────────────────────────
+# ── Audio Processing & Neural AI Inference ───────────────────────────────────
 soundfile>=0.12.0                 # High-fidelity audio read/write (WAV generation)
 onnxruntime>=1.16.0               # High-performance neural inference runtime
+tokenizers>=0.19.0                # Fast subword tokenizer for In-Process Neural Semantic Brain
 kokoro-onnx>=0.3.0                # Kokoro-82M offline neural voice engine
 piper-tts>=1.2.0                  # Piper offline neural voice fallback engine
 
 # ── Notes ────────────────────────────────────────────────────────────────────
 # External tools & neural weights configured automatically by setup_windows.bat:
 #   - FFmpeg & FFprobe (in ./ffmpeg or system PATH)
-#   - Kokoro-82M neural model weights (kokoro-v1.0.int8.onnx & voices-v1.0.bin)
+#   - Kokoro-82M neural voice weights (kokoro-v1.0.int8.onnx & voices-v1.0.bin)
+#   - In-Process Neural Semantic Brain weights (model_quantized.onnx & tokenizer.json)
 # See README.md for full installation details.

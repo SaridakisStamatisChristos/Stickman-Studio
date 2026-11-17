@@ -120,6 +120,18 @@ class _KokoroDownloadThread(QThread):
         self.finished_ok.emit(ok)
 
 
+class _SemanticBrainDownloadThread(QThread):
+    progress = Signal(str, int)
+    finished_ok = Signal(bool)
+
+    def run(self) -> None:
+        from engine.semantic_scene_brain import SemanticSceneBrain
+        ok = SemanticSceneBrain.download_model(
+            progress_callback=lambda s, p: self.progress.emit(s, p)
+        )
+        self.finished_ok.emit(ok)
+
+
 def _make_slider_row(
     label: str,
     minimum: int,
@@ -212,8 +224,49 @@ class SettingsDialog(QDialog):
         tab = self._scrollable_tab()
         layout = tab.layout()
 
-        # Status group
-        status_group = QGroupBox("Ollama Local AI Status")
+        # 1. In-Process Neural Semantic Brain (Primary AI Engine)
+        brain_group = QGroupBox("In-Process AI Neural Semantic Brain (100% Offline • 0 MB VRAM • Zero Ollama)")
+        bg = QVBoxLayout(brain_group)
+        bg.setSpacing(8)
+
+        brain_top = QHBoxLayout()
+        self._brain_dot = QLabel("●")
+        self._brain_dot.setStyleSheet("color: #4CAF50; font-size: 18px;")
+        brain_top.addWidget(self._brain_dot)
+        self._brain_status_lbl = QLabel("Checking Neural Brain…")
+        brain_top.addWidget(self._brain_status_lbl, stretch=1)
+
+        self._brain_test_btn = QPushButton("⚡ Test Brain")
+        self._brain_test_btn.clicked.connect(self._on_test_semantic_brain)
+        brain_top.addWidget(self._brain_test_btn)
+
+        self._brain_dl_btn = QPushButton("⬇ Download / Verify Brain")
+        self._brain_dl_btn.clicked.connect(self._on_download_semantic_brain)
+        brain_top.addWidget(self._brain_dl_btn)
+        bg.addLayout(brain_top)
+
+        self._brain_desc_lbl = QLabel(
+            "Deep neural embedding transformer (MiniLM-L6 · 22.9 MB). Runs in-process in <10ms to map narration to "
+            "60+ physical visual metaphors, posture kinetics, and emotion choreography with zero external daemons."
+        )
+        self._brain_desc_lbl.setWordWrap(True)
+        self._brain_desc_lbl.setStyleSheet("color: #aaa; font-size: 11px;")
+        bg.addWidget(self._brain_desc_lbl)
+
+        self._brain_test_res_lbl = QLabel("")
+        self._brain_test_res_lbl.setStyleSheet("color: #81C784; font-size: 11px; font-weight: bold;")
+        self._brain_test_res_lbl.hide()
+        bg.addWidget(self._brain_test_res_lbl)
+
+        self._brain_progress_bar = QProgressBar()
+        self._brain_progress_bar.setRange(0, 100)
+        self._brain_progress_bar.hide()
+        bg.addWidget(self._brain_progress_bar)
+
+        layout.addWidget(brain_group)
+
+        # 2. External Ollama LLM (Optional)
+        status_group = QGroupBox("External Ollama LLM (Optional — Not Required for Production)")
         sg = QVBoxLayout(status_group)
         top_row = QHBoxLayout()
         self._ollama_dot = QLabel("●")
@@ -232,10 +285,19 @@ class SettingsDialog(QDialog):
         self._bench_lbl = QLabel("Benchmark: not run yet")
         self._bench_lbl.setStyleSheet("color: #aaa; font-size: 11px;")
         sg.addWidget(self._bench_lbl)
+
+        ollama_note = QLabel(
+            "Note: Stickman Studio works 100% offline out-of-the-box using the In-Process Neural Semantic Brain above. "
+            "Ollama is an optional fallback for open-ended text expansion."
+        )
+        ollama_note.setWordWrap(True)
+        ollama_note.setStyleSheet("color: #777; font-size: 10px; font-style: italic;")
+        sg.addWidget(ollama_note)
+
         layout.addWidget(status_group)
 
         # Model selection
-        model_group = QGroupBox("Model Selection (Lightweight 8 GB RAM Safe)")
+        model_group = QGroupBox("Ollama Model Selection (If Using Ollama)")
         mg = QVBoxLayout(model_group)
         mg.setSpacing(8)
 
@@ -463,8 +525,78 @@ class SettingsDialog(QDialog):
         return "\n".join(lines)
 
     def _refresh_runtime_statuses(self) -> None:
+        self._refresh_semantic_brain_status()
         self._test_ollama()
         self._refresh_tts_status()
+
+    def _refresh_semantic_brain_status(self) -> None:
+        try:
+            from engine.semantic_scene_brain import SemanticSceneBrain
+            if SemanticSceneBrain.is_model_available():
+                brain = SemanticSceneBrain.get_instance()
+                if brain._initialized:
+                    self._brain_dot.setStyleSheet("color: #4CAF50; font-size: 18px;")
+                    self._brain_status_lbl.setText("Active (MiniLM-L6 Neural Semantic Engine · 22.9 MB · <10ms inference)")
+                    self._brain_dl_btn.setText("✓ Brain Verified")
+                    self._brain_dl_btn.setEnabled(False)
+                    self._brain_test_btn.setEnabled(True)
+                    return
+            self._brain_dot.setStyleSheet("color: #FF9800; font-size: 18px;")
+            self._brain_status_lbl.setText("Model files not downloaded (~22.9 MB required)")
+            self._brain_dl_btn.setText("⬇ Download Brain (23 MB)")
+            self._brain_dl_btn.setEnabled(True)
+            self._brain_test_btn.setEnabled(False)
+        except Exception as exc:
+            self._brain_dot.setStyleSheet("color: #e94560; font-size: 18px;")
+            self._brain_status_lbl.setText(f"Brain status check error: {exc}")
+
+    def _on_download_semantic_brain(self) -> None:
+        self._brain_dl_btn.setEnabled(False)
+        self._brain_progress_bar.setValue(0)
+        self._brain_progress_bar.show()
+
+        self._brain_thread = _SemanticBrainDownloadThread()
+        self._brain_thread.progress.connect(self._on_semantic_progress)
+        self._brain_thread.finished_ok.connect(self._on_semantic_done)
+        self._brain_thread.start()
+
+    def _on_semantic_progress(self, status: str, pct: int) -> None:
+        self._brain_status_lbl.setText(status)
+        if pct >= 0:
+            self._brain_progress_bar.setValue(pct)
+
+    def _on_semantic_done(self, ok: bool) -> None:
+        self._brain_progress_bar.hide()
+        self._refresh_semantic_brain_status()
+        if ok:
+            QMessageBox.information(
+                self,
+                "Neural Brain Ready",
+                "The In-Process AI Neural Semantic Brain (MiniLM-L6) is downloaded and fully active!\n"
+                "All future script interpretations and visual scene generations will now use deep neural semantic matching.",
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "Download Failed",
+                "Could not download the Neural Semantic Brain from Hugging Face.\n"
+                "Stickman Studio will continue using the high-performance procedural keyword fallback.",
+            )
+
+    def _on_test_semantic_brain(self) -> None:
+        try:
+            from engine.semantic_scene_brain import SemanticSceneBrain
+            brain = SemanticSceneBrain.get_instance()
+            sample = "He realized all the sacrifices in silence were finally turning into gold."
+            met, m_score = brain.match_best_metaphor(sample)
+            emo, e_score = brain.match_best_emotion(sample)
+            act, a_score = brain.match_best_action(sample)
+            res_txt = f"✓ Neural Test: \"{sample[:35]}...\"\n  ➜ Metaphor: {met} (conf: {m_score:.2f})  |  Pose: {act}  |  Emotion: {emo}"
+            self._brain_test_res_lbl.setText(res_txt)
+            self._brain_test_res_lbl.show()
+        except Exception as exc:
+            self._brain_test_res_lbl.setText(f"Test failed: {exc}")
+            self._brain_test_res_lbl.show()
 
     def _refresh_tts_status(self) -> None:
         if not self._tts:
@@ -670,7 +802,7 @@ class SettingsDialog(QDialog):
         super().closeEvent(event)
 
     def _stop_worker_threads(self) -> None:
-        for attr in ("_pull_thread", "_bench_thread", "_kokoro_thread"):
+        for attr in ("_pull_thread", "_bench_thread", "_kokoro_thread", "_brain_thread"):
             th = getattr(self, attr, None)
             if th is not None and th.isRunning():
                 th.wait(1500)

@@ -726,20 +726,66 @@ class AssetLibrary:
         draw.polygon(tail_pts, fill=b_bg, outline=b_outline, width=lw)
         draw.line([(x + w // 3 + 2, y + bubble_h), (x + w // 3 + w // 9 - 2, y + bubble_h)], fill=b_bg, width=lw + 2)
 
-        text = VisualTextSanitizer.sanitize_bubble_text(text, kind="speech")
-        if text:
-            # Multi-line word-wrapped legible text layout
-            lines = textwrap.wrap(text, width=20) if len(text) > 18 else [text]
-            n_lines = max(1, len(lines))
-            target_font_sz = max(11, min(int(bubble_h * 0.65 / n_lines), int(w * 0.14)))
-            if font is None:
-                font = _load_ui_font(target_font_sz, bold=True)
-            line_spacing = int(target_font_sz * 1.25)
-            total_text_h = n_lines * line_spacing
-            start_y = y + max(4, (bubble_h - total_text_h) // 2 + target_font_sz // 2)
-            for i, line in enumerate(lines):
-                ly = start_y + i * line_spacing
-                draw.text((x + w // 2, ly), line, fill=b_fg, font=font, anchor="mm")
+        self._draw_fitted_bubble_text(draw, x, y, w, bubble_h, text, b_fg, kind="speech")
+
+    def _draw_fitted_bubble_text(
+        self,
+        draw: ImageDraw.ImageDraw,
+        x: int,
+        y: int,
+        w: int,
+        bubble_h: int,
+        text: str,
+        fg_col: str,
+        kind: str = "speech",
+    ) -> None:
+        """Render perfectly fitted multi-line text that strictly never overflows bubble bounds."""
+        clean_text = VisualTextSanitizer.sanitize_bubble_text(text, kind=kind)
+        if not clean_text:
+            return
+
+        avail_w = max(30, int(w * 0.86))
+        avail_h = max(16, int(bubble_h * 0.78))
+
+        best_font = None
+        best_lines: list[str] = [clean_text]
+        font_sz = max(10, min(24, int(avail_h * 0.52)))
+
+        while font_sz >= 9:
+            curr_font = _load_ui_font(font_sz, bold=True)
+            avg_cw = max(5.0, curr_font.getlength("m") * 0.72)
+            wrap_chars = max(8, int(avail_w / avg_cw))
+            cand_lines = textwrap.wrap(clean_text, width=wrap_chars) or [clean_text]
+
+            max_lw = max((curr_font.getlength(ln) for ln in cand_lines), default=0)
+            line_sp = int(font_sz * 1.22)
+            total_th = len(cand_lines) * line_sp
+
+            if max_lw <= avail_w and total_th <= avail_h:
+                best_font = curr_font
+                best_lines = cand_lines
+                break
+            font_sz -= 1
+
+        if best_font is None:
+            font_sz = 9
+            best_font = _load_ui_font(font_sz, bold=True)
+            avg_cw = max(5.0, best_font.getlength("m") * 0.72)
+            wrap_chars = max(8, int(avail_w / avg_cw))
+            best_lines = textwrap.wrap(clean_text, width=wrap_chars) or [clean_text]
+            max_lines = max(1, avail_h // int(font_sz * 1.22))
+            if len(best_lines) > max_lines:
+                best_lines = best_lines[:max_lines]
+                if len(best_lines[-1]) > 3:
+                    best_lines[-1] = best_lines[-1][:-2] + "…"
+
+        line_spacing = int(font_sz * 1.22)
+        total_text_h = len(best_lines) * line_spacing
+        start_y = y + max(3, (bubble_h - total_text_h) // 2 + font_sz // 2)
+        cx = x + w // 2
+        for i, line in enumerate(best_lines):
+            ly = start_y + i * line_spacing
+            draw.text((cx, ly), line, fill=fg_col, font=best_font, anchor="mm")
 
     def _draw_thought_bubble(
         self,
@@ -764,20 +810,7 @@ class AssetLibrary:
         for cr, cx_off, cy_off in [(5, w // 3, bubble_h + h // 10), (7, w // 4, bubble_h + h // 4), (4, w // 5, bubble_h + h // 3)]:
             bcx, bcy = x + cx_off, y + cy_off
             draw.ellipse([bcx - cr, bcy - cr, bcx + cr, bcy + cr], fill=b_bg, outline=b_outline, width=max(1, lw // 2))
-        text = VisualTextSanitizer.sanitize_bubble_text(text, kind="thought")
-        if text:
-            # Multi-line word-wrapped legible text layout
-            lines = textwrap.wrap(text, width=20) if len(text) > 18 else [text]
-            n_lines = max(1, len(lines))
-            target_font_sz = max(11, min(int(bubble_h * 0.65 / n_lines), int(w * 0.14)))
-            if font is None:
-                font = _load_ui_font(target_font_sz, bold=True)
-            line_spacing = int(target_font_sz * 1.25)
-            total_text_h = n_lines * line_spacing
-            start_y = y + max(4, (bubble_h - total_text_h) // 2 + target_font_sz // 2)
-            for i, line in enumerate(lines):
-                ly = start_y + i * line_spacing
-                draw.text((x + w // 2, ly), line, fill=b_fg, font=font, anchor="mm")
+        self._draw_fitted_bubble_text(draw, x, y, w, bubble_h, text, b_fg, kind="thought")
 
     # ------------------------------------------------------------------
     # Data & Symbolic Graphics

@@ -179,6 +179,30 @@ class AIBackgroundEngine:
             ["CYBER_SYNTHWAVE", "RETRO_VAPORWAVE", "TWILIGHT_VIOLET"],
             ["CHESSBOARD_REALM", "MINIMAL_ABSTRACT"],
         ),
+        "STOIC_PHILOSOPHY": (
+            ["ZEN_MIST", "ALPINE_MIST", "TWILIGHT_VIOLET", "VINTAGE_SEPIA"],
+            ["TEMPLE_SHRINE", "COURTROOM_COLUMNS", "ART_GALLERY", "MOUNTAIN_CRAGS"],
+        ),
+        "PSYCHOLOGY_MIND": (
+            ["TWILIGHT_VIOLET", "NEBULA_CLUSTER", "ZEN_MIST", "HOLOGRAPHIC_HUD"],
+            ["QUANTUM_COLLIDER", "CHESSBOARD_REALM", "COZY_LIBRARY_INTERIOR", "ART_GALLERY"],
+        ),
+        "STARTUP_BUSINESS": (
+            ["MINIMAL_STUDIO", "TWILIGHT_VIOLET", "GOLDEN_SUNSET", "OFFICE_FLUORESCENT"],
+            ["MODERN_OFFICE_INTERIOR", "ROOFTOP_TERRACE", "CITY_SKYSCRAPERS", "COFFEE_SHOP_CAFE"],
+        ),
+        "SCIENCE_INNOVATION": (
+            ["LAB_CLEANROOM", "BLUEPRINT_CAD", "HOLOGRAPHIC_HUD", "MATRIX_DIGITAL"],
+            ["SCIENCE_LAB", "QUANTUM_COLLIDER", "HOSPITAL_CLINIC_INTERIOR"],
+        ),
+        "CAFE_LIFESTYLE": (
+            ["WARM_INTERIOR", "GOLDEN_SUNSET", "ZEN_MIST", "AUTUMN_BREEZE"],
+            ["COFFEE_SHOP_CAFE", "LIVING_ROOM", "ROOFTOP_TERRACE", "GARDEN_GREENHOUSE"],
+        ),
+        "CHESS_STRATEGY": (
+            ["TWILIGHT_VIOLET", "VINTAGE_SEPIA", "MINIMAL_STUDIO"],
+            ["CHESSBOARD_REALM", "COURTROOM_COLUMNS", "MEDIEVAL_FORTRESS"],
+        ),
     }
 
     @classmethod
@@ -590,7 +614,17 @@ class AIBackgroundEngine:
                     scores[theme] += 3
 
         best_theme, best_score = max(scores.items(), key=lambda item: item[1])
-        return best_theme if best_score >= 3 else "MODERN_STUDIO"
+        if best_score >= 3:
+            return best_theme
+
+        # When score is below threshold, cycle across evocative diverse environments instead of blank studio
+        fallback_pool = [
+            "COZY_LIBRARY", "MODERN_OFFICE", "CITY_SKYLINE", "NATURE_FOREST",
+            "TECH_CYBER_SERVER", "TRADING_FINANCE", "GALLERY_REFLECT", "HIGHWAY_ROAD",
+            "STOIC_PHILOSOPHY", "PSYCHOLOGY_MIND", "STARTUP_BUSINESS", "CAFE_LIFESTYLE"
+        ]
+        h_idx = int(hashlib.md5(lower.encode("utf-8")).hexdigest()[:4], 16) % len(fallback_pool)
+        return fallback_pool[h_idx]
 
     # ------------------------------------------------------------------
     # Legacy Environment Renderers
@@ -964,5 +998,29 @@ class AIBackgroundEngine:
         "CONTRAST_SPLIT": (
             ("versus", "vs", "opposite", "contrast", "duality", "comparison", "difference"),
             ("two paths", "easy way or hard way", "short term vs long term", "before and after")
+        ),
+        "STOIC_PHILOSOPHY": (
+            ("stoic", "stoicism", "marcus", "aurelius", "epictetus", "seneca", "virtue", "wisdom", "discipline", "control", "soul", "ancient", "temple", "peace", "calm", "destiny", "fate", "meditations"),
+            ("inner peace", "circle of control", "stoic philosophy", "daily discipline", "master your mind", "amor fati")
+        ),
+        "PSYCHOLOGY_MIND": (
+            ("psychology", "dopamine", "mindset", "habit", "habits", "brain", "subconscious", "cognitive", "overthinking", "focus", "mental", "neuro", "memory", "emotion", "anxiety", "depression", "behavior"),
+            ("human psychology", "reticular activating system", "dopamine detox", "atomic habits", "subconscious mind", "mental model")
+        ),
+        "STARTUP_BUSINESS": (
+            ("business", "startup", "entrepreneur", "founder", "sales", "revenue", "customer", "company", "hustle", "scale", "client", "product", "pitch", "market", "branding", "growth", "monopoly"),
+            ("start a business", "build a company", "scale to millions", "sales pipeline", "startup journey", "market share")
+        ),
+        "SCIENCE_INNOVATION": (
+            ("science", "physics", "biology", "chemistry", "lab", "experiment", "genetic", "evolution", "dna", "atom", "quantum", "research", "scientific", "microscope", "discovery", "formula"),
+            ("scientific research", "quantum physics", "genetic code", "in the lab", "evolution of")
+        ),
+        "CAFE_LIFESTYLE": (
+            ("lifestyle", "routine", "morning", "coffee", "tea", "relax", "casual", "conversation", "friend", "friends", "dinner", "social", "talk", "hangout", "chilling"),
+            ("morning routine", "cup of coffee", "coffee shop", "daily lifestyle", "sitting together")
+        ),
+        "CHESS_STRATEGY": (
+            ("chess", "checkmate", "strategy", "strategic", "tactic", "tactics", "move", "plan", "grandmaster", "opponent", "pawn", "king", "queen", "gambit"),
+            ("chess board", "strategic move", "think three moves ahead", "check mate", "queen's gambit")
         ),
     }

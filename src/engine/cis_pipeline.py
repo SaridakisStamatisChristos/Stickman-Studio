@@ -224,6 +224,7 @@ class CISPipeline:
         cta_audio_text = str(params.get("cis_cta_audio_text", "") or "").strip()
         music_path = params.get("music_path") or params.get("custom_music_path") or None
         music_vol = float(params.get("music_volume", 0.12))
+        sfx_vol = float(params.get("sfx_volume", 0.50))
 
         slug = re.sub(r"[^a-z0-9]+", "-", topic.lower())[:36].strip("-") or "cis-video"
         job_dir = self.output_dir / f"{slug}_{int(time.time())}"
@@ -475,8 +476,104 @@ class CISPipeline:
             return None
 
         # ------------------------------------------------------------------
-        # 4. Background Music & Manifest (project.json)
+        # 4. Sound Effects (SFX) & Background Music
         # ------------------------------------------------------------------
+        sfx_dir = job_dir / "assets" / "sfx"
+        sfx_dir.mkdir(parents=True, exist_ok=True)
+        final_voice_track = narration_wav
+        has_mixed_sfx = False
+
+        if sfx_vol > 0.01:
+            try:
+                from audio.sfx_synth import SFXSynth
+                sfx_synth = SFXSynth()
+                sfx_cache: dict[str, str] = {}
+
+                def _get_sfx(kind: str) -> Optional[str]:
+                    if kind not in sfx_cache:
+                        p = str(sfx_dir / f"sfx_{kind}.wav")
+                        if sfx_synth.generate_sfx(kind, p):
+                            sfx_cache[kind] = p
+                    return sfx_cache.get(kind)
+
+                raw_sfx_events: list[dict] = []
+                for s_i, sc in enumerate(storyboard):
+                    s_start = float(sc.get("_audio_start", 0.0))
+                    sc_dur = float(sc.get("duration", 3.0))
+                    choreo = str(sc.get("choreography", "")).lower()
+                    narr_text = str(sc.get("narration", "")).lower()
+                    words_set = set(re.findall(r"[a-z']+", narr_text))
+
+                    # Transition sound sweep
+                    if s_i > 0:
+                        trans_sfx = _get_sfx("whoosh" if s_i % 2 == 1 else "chime_soft")
+                        if trans_sfx:
+                            raw_sfx_events.append({"path": trans_sfx, "time": s_start, "volume": sfx_vol * 0.35})
+
+                    # Choreography-specific action sound effect
+                    ch_sfx: Optional[str] = None
+                    if "rocket" in choreo:
+                        ch_sfx = _get_sfx("rocket_whoosh")
+                    elif any(k in choreo for k in ("terminal", "code", "tech", "laptop")):
+                        ch_sfx = _get_sfx("keyboard_typing")
+                    elif any(k in choreo for k in ("crypto", "compound", "money", "wealth", "asset")):
+                        ch_sfx = _get_sfx("cash_register")
+                    elif any(k in choreo for k in ("gym", "dumbbell", "lift")):
+                        ch_sfx = _get_sfx("taiko_hit")
+                    elif any(k in choreo for k in ("stoic", "pillar", "statue")):
+                        ch_sfx = _get_sfx("dramatic_boom")
+                    elif any(k in choreo for k in ("spark", "idea", "lightbulb", "brain")):
+                        ch_sfx = _get_sfx("chime_idea")
+                    elif any(k in choreo for k in ("phone", "trap", "notification")):
+                        ch_sfx = _get_sfx("notification")
+                    elif any(k in choreo for k in ("puzzle", "domino", "clock", "gear")):
+                        ch_sfx = _get_sfx("click")
+                    elif any(k in choreo for k in ("staircase", "step", "walk")):
+                        ch_sfx = _get_sfx("footstep")
+                    elif any(k in choreo for k in ("celebrat", "triumph")):
+                        ch_sfx = _get_sfx("applause_cheer")
+                    elif any(k in choreo for k in ("scale", "balance", "two_path")):
+                        ch_sfx = _get_sfx("whoosh")
+                    elif any(k in choreo for k in ("magic", "star", "sparkle")):
+                        ch_sfx = _get_sfx("magic_sparkle")
+
+                    if ch_sfx:
+                        raw_sfx_events.append({"path": ch_sfx, "time": s_start + min(0.35, sc_dur * 0.20), "volume": sfx_vol * 0.45})
+
+                    # Keyword prop sounds
+                    if any(w in words_set for w in ("money", "dollar", "wealth", "cash", "invest")) and "crypto" not in choreo:
+                        p_coin = _get_sfx("coin_clink")
+                        if p_coin:
+                            raw_sfx_events.append({"path": p_coin, "time": s_start + min(0.40, sc_dur * 0.35), "volume": sfx_vol * 0.40})
+                    elif any(w in words_set for w in ("alarm", "warning", "danger", "alert")):
+                        p_bell = _get_sfx("ding_bell")
+                        if p_bell:
+                            raw_sfx_events.append({"path": p_bell, "time": s_start + min(0.40, sc_dur * 0.35), "volume": sfx_vol * 0.42})
+                    elif any(w in words_set for w in ("idea", "realize", "discover", "secret")) and "spark" not in choreo:
+                        p_idea = _get_sfx("chime_idea")
+                        if p_idea:
+                            raw_sfx_events.append({"path": p_idea, "time": s_start + min(0.45, sc_dur * 0.35), "volume": sfx_vol * 0.45})
+
+                if raw_sfx_events:
+                    comp_sfx_wav = str(job_dir / "assets" / "audio" / "composite_sfx.wav")
+                    Path(comp_sfx_wav).parent.mkdir(parents=True, exist_ok=True)
+                    if audio_mixer.build_composite_sfx_track(raw_sfx_events, comp_sfx_wav, narration_duration):
+                        voice_sfx_wav = str(job_dir / "assets" / "audio" / "voice_with_sfx.wav")
+                        if audio_mixer.mix_audio(
+                            voice_path=narration_wav,
+                            music_path=None,
+                            sfx_path=comp_sfx_wav,
+                            output_path=voice_sfx_wav,
+                            voice_volume=1.0,
+                            music_volume=0.0,
+                            sfx_volume=1.0,
+                        ):
+                            final_voice_track = voice_sfx_wav
+                            has_mixed_sfx = True
+                            _log(log_callback, f"Auto-synced {len(raw_sfx_events)} procedural sound effects into audio track.")
+            except Exception as sfx_err:
+                _log(log_callback, f"SFX note: {sfx_err}")
+
         if not music_path and music_vol > 0.01:
             score_wav = str(job_dir / "assets" / "audio" / "ambient_score.wav")
             try:
@@ -491,12 +588,13 @@ class CISPipeline:
         manifest_path = build_manifest(
             scenes=storyboard,
             scene_png_paths=scene_png_paths,
-            narration_wav_path=narration_wav,
+            narration_wav_path=final_voice_track,
             narration_duration=narration_duration,
             music_path=music_path,
             output_project_dir=str(job_dir),
             aspect_ratio=fmt,
             music_gain=music_vol,
+            contains_sfx=has_mixed_sfx,
         )
         _log(log_callback, f"Manifest written to {manifest_path}")
 
@@ -518,10 +616,27 @@ class CISPipeline:
 
         if not output_mp4 or not Path(output_mp4).exists():
             _log(log_callback, "Executing Native Python + FFmpeg illustrated compositing engine…")
+            fallback_audio = final_voice_track
+            if music_path and os.path.exists(music_path) and music_vol > 0.01:
+                master_audio_wav = str(job_dir / "assets" / "audio" / "master_audio.wav")
+                try:
+                    if audio_mixer.mix_audio(
+                        voice_path=final_voice_track,
+                        music_path=music_path,
+                        sfx_path=None,
+                        output_path=master_audio_wav,
+                        voice_volume=1.0,
+                        music_volume=music_vol,
+                        sfx_volume=0.0,
+                    ):
+                        fallback_audio = master_audio_wav
+                except Exception as mix_err:
+                    _log(log_callback, f"Music mix fallback note: {mix_err}")
+
             output_mp4 = self._render_ffmpeg_fallback(
                 storyboard=storyboard,
                 scene_png_paths=scene_png_paths,
-                narration_wav=narration_wav,
+                narration_wav=fallback_audio,
                 duration=narration_duration,
                 job_dir=job_dir,
                 log_callback=log_callback,
@@ -733,16 +848,52 @@ class CISPipeline:
                 else:
                     frames_n = max(1, int(round(s_dur * fps)))
 
-                # Cinematic Ken Burns camera motion
-                zoom_in = (i % 2 == 0)
+                # Cinematic 2.5D procedural camera motion driven by storyboard preset
+                sc_preset = "dolly_in_smooth"
+                if storyboard and i < len(storyboard):
+                    sc_preset = str(storyboard[i].get("motion_preset", "dolly_in_smooth")).lower()
+
                 for f_idx in range(frames_n):
                     progress = f_idx / float(frames_n)
                     current_time = written_frames / float(fps)
-                    scale = 1.0 + (0.04 * progress if zoom_in else 0.04 * (1.0 - progress))
-                    zw, zh = int(w * scale), int(h * scale)
+                    ease = 0.5 - 0.5 * math.cos(progress * math.pi)
+
+                    if "out" in sc_preset:
+                        scale = 1.06 - 0.06 * ease
+                        zw, zh = int(w * scale), int(h * scale)
+                        crop_x = (zw - w) // 2
+                        crop_y = (zh - h) // 2
+                    elif "right" in sc_preset:
+                        scale = 1.05
+                        zw, zh = int(w * scale), int(h * scale)
+                        crop_x = int((zw - w) * (0.20 + 0.60 * ease))
+                        crop_y = (zh - h) // 2
+                    elif "left" in sc_preset:
+                        scale = 1.05
+                        zw, zh = int(w * scale), int(h * scale)
+                        crop_x = int((zw - w) * (0.80 - 0.60 * ease))
+                        crop_y = (zh - h) // 2
+                    elif any(k in sc_preset for k in ("crane", "rise", "tilt")):
+                        scale = 1.05
+                        zw, zh = int(w * scale), int(h * scale)
+                        crop_x = (zw - w) // 2
+                        crop_y = int((zh - h) * (0.80 - 0.60 * ease))
+                    elif "pulse" in sc_preset:
+                        scale = 1.0 + 0.035 * math.sin(progress * math.pi)
+                        zw, zh = int(w * scale), int(h * scale)
+                        crop_x = (zw - w) // 2
+                        crop_y = (zh - h) // 2
+                    else:
+                        scale = 1.0 + 0.06 * ease if (i % 2 == 0) else 1.06 - 0.06 * ease
+                        zw, zh = int(w * scale), int(h * scale)
+                        crop_x = (zw - w) // 2
+                        crop_y = (zh - h) // 2
+
+                    crop_x = max(0, min(zw - w, crop_x))
+                    # Organic subtle living sway in fallback pipe
+                    bob_y = int(math.sin(current_time * 2.0 * math.pi * 1.25) * 3)
+                    crop_y = max(0, min(zh - h, crop_y + bob_y))
                     scaled = base_img.resize((zw, zh), Image.Resampling.BILINEAR)
-                    crop_x = (zw - w) // 2
-                    crop_y = (zh - h) // 2
                     frame = scaled.crop((crop_x, crop_y, crop_x + w, crop_y + h))
 
                     # Render synchronized high-contrast subtitle overlay
@@ -759,6 +910,7 @@ class CISPipeline:
                                         "end": c_end,
                                         "style": "bold_social",
                                         "uppercase": True,
+                                        "words": cue.get("words", []),
                                     },
                                     current_time,
                                 )

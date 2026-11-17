@@ -773,6 +773,50 @@ def _score_choreographies(text: str) -> list[tuple[int, str]]:
     except Exception:
         pass
 
+    # Neural Semantic Brain Integration for CIS mode (MiniLM-L6 ONNX Transformer)
+    try:
+        from engine.semantic_scene_brain import SemanticSceneBrain
+        brain = SemanticSceneBrain.get_instance()
+        if brain._initialized:
+            n_met, n_m_score = brain.match_best_metaphor(text)
+            if n_met and n_m_score >= 0.16:
+                metaphor_cis_map = {
+                    "EXPONENTIAL_COMPOUND": "compound_interest_snowball",
+                    "ICEBERG_DEPTH": "iceberg_hidden_depth",
+                    "HAMSTER_WHEEL": "hamster_wheel_break",
+                    "LEVER_BOULDER": "scale_tipping",
+                    "BALANCE_SCALE": "scales_of_justice",
+                    "DOMINO_CHAIN": "domino_ripple",
+                    "ROCKET_LAUNCH": "rocket_breakthrough",
+                    "HOURGLASS": "hourglass_sprint",
+                    "STAIRCASE": "staircase_climb",
+                    "MIRROR": "split_mirror_ideal",
+                    "PHONE": "phone_trap",
+                    "SHIELD": "boundary_shield",
+                    "LIGHTHOUSE": "lighthouse_fog_beam",
+                    "BATTERY": "battery_supercharge",
+                    "BRAIN": "neural_net_synapse",
+                    "CHESS": "chess_checkmate_move",
+                }
+                mapped_choreo = metaphor_cis_map.get(n_met)
+                if mapped_choreo:
+                    hit_scores.append((int(n_m_score * 20), mapped_choreo))
+
+            n_arch, n_a_score = brain.match_best_archetype(text)
+            if n_arch and n_a_score >= 0.18:
+                archetype_cis_map = {
+                    "SPLIT_SCREEN": "split_cards_slide",
+                    "FULLSCREEN_INFOGRAPHIC": "compound_interest_snowball",
+                    "HERD_REBEL": "crowd_filter",
+                    "SCALE_CONTRAST": "stoic_pillar_stand",
+                    "HERO_PROP_MECHANIC": "hamster_wheel_break",
+                }
+                mapped_arch = archetype_cis_map.get(n_arch)
+                if mapped_arch:
+                    hit_scores.append((int(n_a_score * 16), mapped_arch))
+    except Exception as _brain_err:
+        logger.debug("CIS Neural Brain pass note: %s", _brain_err)
+
     hit_scores.sort(key=lambda item: (-item[0], item[1]))
     return hit_scores
 
@@ -785,9 +829,11 @@ def _pick_choreography(
     seed: int,
     prev_choreo: str,
     used_choreos: set[str],
+    topic: str = "",
 ) -> tuple[str, int]:
     """Select the strongest script-matched choreography without repetitive cycling."""
-    hit_scores = _score_choreographies(text)
+    scoring_text = f"{topic}. {text}" if (idx == 0 and topic) else text
+    hit_scores = _score_choreographies(scoring_text)
     best_score = hit_scores[0][0] if hit_scores else 0
     scored = [c for _, c in hit_scores]
 
@@ -980,6 +1026,7 @@ def _build_dynamic_scene_fields(
     bg_wash = theme.get("wash_tints", {}).get(profile, theme["paper_bg"])
     return {
         "scene_id": idx + 1,
+        "topic": topic,
         "narration": narration,
         "video_profile": profile,
         "visual_style": render_style,
@@ -1050,6 +1097,7 @@ def _build_cta_scene(
     bg_wash = theme.get("wash_tints", {}).get(profile, theme["paper_bg"])
     return {
         "scene_id": scene_id,
+        "topic": topic,
         "narration": spoken,
         "video_profile": profile,
         "visual_style": render_style,
@@ -1253,7 +1301,7 @@ class CISStoryboardPlanner:
             speaker_name = turn.get("speaker_name", "Alex")
 
             choreo, _ = _pick_choreography(
-                narration, i, total_scenes, profile, seed, prev_choreo, used_choreos
+                narration, i, total_scenes, profile, seed, prev_choreo, used_choreos, topic=topic
             )
             prev_choreo = choreo
             used_choreos.add(choreo)
@@ -1319,7 +1367,7 @@ class CISStoryboardPlanner:
         for i, chunk in enumerate(chunks):
             narration = " ".join(chunk).strip()
             choreo, _score = _pick_choreography(
-                narration, i, total_scenes, profile, seed, prev_choreo, used_choreos
+                narration, i, total_scenes, profile, seed, prev_choreo, used_choreos, topic=topic
             )
             prev_choreo = choreo
             used_choreos.add(choreo)

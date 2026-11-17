@@ -497,9 +497,11 @@ class ProceduralSceneEngine:
         scene_idx: int = 0,
         total_scenes: int = 1,
         target_duration: float = 3.5,
+        topic: str = "",
     ) -> dict[str, Any]:
         """Synthesize a 100% unique, topic-aligned scene matching the sentence."""
         text_lower = narration.lower().strip()
+        topic_lower = (topic or "").lower().strip()
         words = re.findall(r"[a-z0-9']+", text_lower)
         stems = set(_stem_word(w) for w in words)
         raw_and_stems = set(words) | stems
@@ -540,6 +542,28 @@ class ProceduralSceneEngine:
                 total_scenes=total_scenes,
             )
             has_explicit_verb = False
+
+        # 2b. In-Process Neural Semantic Brain (MiniLM-L6 ONNX Transformer)
+        # Deep contextual understanding of abstract metaphors, emotions, and postures
+        try:
+            from engine.semantic_scene_brain import SemanticSceneBrain
+            brain = SemanticSceneBrain.get_instance()
+            if brain._initialized:
+                recent_mets = [prev.get("_metaphor") for prev in self.history[-3:] if prev.get("_metaphor")]
+                n_met, n_m_score = brain.match_best_metaphor(narration, recent_metaphors=recent_mets)
+                if n_met and n_m_score >= 0.16 and (best_score < 8.0 or not best_metaphor_key):
+                    best_metaphor_key = n_met
+                    best_score = max(best_score, 12.0 * n_m_score)
+
+                n_act, n_a_score = brain.match_best_action(narration)
+                if n_act and n_a_score >= 0.20 and not has_explicit_verb:
+                    sem_action = n_act
+
+                n_emo, n_e_score = brain.match_best_emotion(narration)
+                if n_emo and n_e_score >= 0.18:
+                    sem_emotion = n_emo
+        except Exception as _brain_err:
+            logger.debug("Neural Semantic Brain inference pass note: %s", _brain_err)
 
         # Extract speech/thought bubble ONLY when the narration explicitly contains quotes!
         speech, thought = self._extract_quoted_dialogue(narration)
@@ -629,6 +653,54 @@ class ProceduralSceneEngine:
             bg = "CAVE"
         elif self.pack.id == "a5_historical_cartoon" and bg in ("OFFICE", "CLASSROOM"):
             bg = "CASTLE"
+        elif scene_idx == 0 and topic_lower and bg not in ("CAVE", "CASTLE"):
+            if any(k in topic_lower for k in ("medicine", "hospital", "doctor", "health", "biotech")) and any(k in topic_lower for k in ("ai", "code", "tech", "algorithm", "software")):
+                bg = "HOSPITAL_CLINIC"
+            elif any(k in topic_lower for k in ("space", "rocket", "mars", "moon", "star", "cosmos", "orbit", "planet", "astronomy")):
+                bg = "SPACE_COSMOS"
+            elif any(k in topic_lower for k in ("history", "empire", "rome", "napoleon", "caesar", "war", "battle", "ancient", "castle", "stoic")):
+                bg = "MEDIEVAL_CASTLE"
+            elif any(k in topic_lower for k in ("code", "coding", "software", "python", "ai", "tech", "algorithm", "terminal", "server")):
+                bg = "TECH_CYBER_SERVER"
+            elif any(k in topic_lower for k in ("money", "wealth", "invest", "crypto", "trading", "finance", "stock")):
+                bg = "TRADING_FINANCE"
+            elif any(k in topic_lower for k in ("gym", "workout", "muscle", "fitness", "exercise", "bodybuilding")):
+                bg = "FITNESS_GYM"
+            elif any(k in topic_lower for k in ("hospital", "medicine", "doctor", "health", "biology", "dna")):
+                bg = "HOSPITAL_CLINIC"
+            elif any(k in topic_lower for k in ("nature", "forest", "mountain", "tree", "river", "outdoor")):
+                bg = "NATURE_FOREST"
+
+        # 4. Neural-Driven Visual Layout Archetype Selection
+        chosen_archetype, archetype_data = self._select_layout_archetype(
+            narration=narration,
+            text_lower=text_lower,
+            chosen_metaphor=chosen_metaphor,
+            scene_idx=scene_idx,
+            total_scenes=total_scenes,
+            is_multi=is_multi,
+            topic=topic,
+        )
+
+        # Adapt character kinematics for specialized scene archetypes
+        if chosen_archetype == "SCALE_CONTRAST" and characters:
+            characters[0]["scale"] = 0.58
+            characters[0]["start_x"] = 0.18
+            characters[0]["end_x"] = 0.20
+            characters[0]["action"] = "POINT_UP"
+        elif chosen_archetype == "HERD_REBEL" and characters:
+            characters[0]["scale"] = 1.30
+            characters[0]["color"] = "#38BDF8"
+            characters[0]["facing"] = "left"
+            characters[0]["start_x"] = 0.22
+            characters[0]["end_x"] = 0.20
+            characters[0]["action"] = archetype_data.get("hero_action", "WALK_LEFT")
+        elif chosen_archetype == "FULLSCREEN_INFOGRAPHIC" and characters:
+            characters[0]["scale"] = 1.20
+            characters[0]["start_x"] = 0.16
+            characters[0]["end_x"] = 0.18
+            characters[0]["facing"] = "right"
+            characters[0]["action"] = "PRESENT_CHART"
 
         scene: dict[str, Any] = {
             "id": scene_idx + 1,
@@ -643,6 +715,9 @@ class ProceduralSceneEngine:
             "transition_in": self.pack.preferred_transition,
             "emotion": emotion,
             "_metaphor": chosen_metaphor,
+            "layout_archetype": chosen_archetype,
+            "archetype_data": archetype_data,
+            "topic": topic,
         }
 
         self.history.append(scene)
@@ -1280,4 +1355,209 @@ class ProceduralSceneEngine:
                 return ("", text)
             return (text, "")
         return ("", "")
+
+    def _select_layout_archetype(
+        self,
+        narration: str,
+        text_lower: str,
+        chosen_metaphor: Optional[str],
+        scene_idx: int,
+        total_scenes: int,
+        is_multi: bool,
+        topic: str = "",
+    ) -> tuple[str, dict[str, Any]]:
+        """
+        Dynamically selects a high-impact visual scene archetype (Split-Screen, Fullscreen
+        Infographic, Herd Rebel, Scale Contrast, Hero Prop Mechanic, Kinetic Concept Badge).
+        Guarantees that consecutive scenes NEVER share the same visual structure.
+        """
+        recent_archetypes = [
+            s.get("layout_archetype")
+            for s in self.history[-2:]
+            if s.get("layout_archetype")
+        ]
+
+        candidate_scores: dict[str, float] = {
+            "SPLIT_SCREEN": 0.0,
+            "FULLSCREEN_INFOGRAPHIC": 0.0,
+            "HERD_REBEL": 0.0,
+            "SCALE_CONTRAST": 0.0,
+            "HERO_PROP_MECHANIC": 0.0,
+            "KINETIC_CONCEPT_CARD": 0.0,
+            "STAGE_INTERACTION": 0.0,
+            "STAGE_STANDARD": 0.0,
+        }
+
+        # 1. Neural Semantic Brain Archetype Match
+        try:
+            from engine.semantic_scene_brain import SemanticSceneBrain
+            brain = SemanticSceneBrain.get_instance()
+            if brain._initialized:
+                best_n_arch, n_score = brain.match_best_archetype(narration, recent_archetypes=recent_archetypes)
+                if best_n_arch and n_score > 0.15:
+                    candidate_scores[best_n_arch] += float(n_score) * 1.5
+        except Exception:
+            pass
+
+        # 2. Heuristic Keyword & Metaphor Boosters
+        # SPLIT_SCREEN: Comparison / Contrast / Choice / 99% vs 1%
+        if any(w in text_lower for w in (" vs ", "versus", "99%", " 1%", "instead of", "two types", "winners vs", "rich vs", "contrast", "dilemma", "while most", "on one hand", "difference between", "choice", "or you can")):
+            candidate_scores["SPLIT_SCREEN"] += 1.8
+
+        # FULLSCREEN_INFOGRAPHIC: Exponential growth, Iceberg, Balance scale, Pyramid
+        if any(w in text_lower for w in ("exponential", "compound", "growth curve", "iceberg", "below the surface", "hidden depth", "balance scale", "weighing", "pyramid", "hierarchy", "percent", "hockey stick", "foundation", "chart", "metrics")) or \
+           chosen_metaphor in ("ICEBERG_DEPTH", "EXPONENTIAL_COMPOUND", "LEVER_BOULDER"):
+            candidate_scores["FULLSCREEN_INFOGRAPHIC"] += 1.8
+
+        # HERD_REBEL: Crowd conformity, sheep, society, walking alone, rebel
+        if any(w in text_lower for w in ("crowd", "society", "everyone", "sheep", "conformity", "normal people", "fit in", "alone", "rebel", "stand out", "own path", "maverick", "against the grain", "majority")):
+            candidate_scores["HERD_REBEL"] += 1.9
+
+        # HERO_PROP_MECHANIC: Hamster wheel, pushing boulder uphill, puppet strings, chains
+        if any(w in text_lower for w in ("rat race", "hamster wheel", "running in circles", "pushing boulder", "uphill battle", "puppet", "strings", "marionette", "chained", "trapped in", "cage")) or \
+           chosen_metaphor in ("HAMSTER_WHEEL", "LEVER_BOULDER"):
+            candidate_scores["HERO_PROP_MECHANIC"] += 1.9
+
+        # SCALE_CONTRAST: Colossal mountain, monolithic clock, dwarfed by destiny
+        if any(w in text_lower for w in ("massive obstacle", "giant mountain", "monolith", "clock ticking", "time running out", "colossal", "overwhelmed by", "towering", "destiny", "staring into the abyss", "giant clock")):
+            candidate_scores["SCALE_CONTRAST"] += 1.8
+
+        # KINETIC_CONCEPT_CARD: Golden rule, principle, secret formula, reality check
+        if any(w in text_lower for w in ("golden rule", "the secret is", "core principle", "the real truth", "remember this", "key takeaway", "fundamental law", "formula", "rule #1", "lesson")):
+            candidate_scores["KINETIC_CONCEPT_CARD"] += 1.7
+
+        # STAGE_INTERACTION: Multi-character dialogues
+        if is_multi:
+            candidate_scores["STAGE_INTERACTION"] += 1.4
+
+        # Enforce Negative Similarity Constraint (penalize recent archetypes heavily)
+        for prev in recent_archetypes:
+            if prev in candidate_scores:
+                candidate_scores[prev] -= 2.5
+
+        # Pick the winning archetype
+        sorted_candidates = sorted(candidate_scores.items(), key=lambda kv: kv[1], reverse=True)
+        chosen = sorted_candidates[0][0]
+
+        # If highest score is still <= 0.0 (e.g. all penalized or generic text),
+        # cycle through diverse archetypes by scene index to guarantee visual variety!
+        if sorted_candidates[0][1] <= 0.05:
+            variety_cycle = [
+                "SPLIT_SCREEN",
+                "FULLSCREEN_INFOGRAPHIC",
+                "HERD_REBEL",
+                "HERO_PROP_MECHANIC",
+                "SCALE_CONTRAST",
+                "KINETIC_CONCEPT_CARD",
+            ]
+            valid_cycle = [a for a in variety_cycle if a not in recent_archetypes]
+            chosen = valid_cycle[scene_idx % len(valid_cycle)] if valid_cycle else variety_cycle[scene_idx % len(variety_cycle)]
+
+        # Synthesize archetype data
+        arch_data = self._synthesize_archetype_data(chosen, narration, text_lower, chosen_metaphor, topic=topic)
+        return chosen, arch_data
+
+    def _synthesize_archetype_data(
+        self,
+        archetype: str,
+        narration: str,
+        text_lower: str,
+        chosen_metaphor: Optional[str],
+        topic: str = "",
+    ) -> dict[str, Any]:
+        """Synthesizes rich parameters, titles, badges, and layout configs for the selected archetype."""
+        data: dict[str, Any] = {"archetype": archetype}
+        clean_topic_upper = (topic or "").strip().rstrip(".!?").upper()[:24]
+
+        if archetype == "SPLIT_SCREEN":
+            is_phone = any(w in text_lower for w in ("phone", "scroll", "distract", "lazy", "bed", "snooze"))
+            is_money = any(w in text_lower for w in ("money", "invest", "wealth", "rich", "cash", "earn"))
+            data.update({
+                "left_title": "THE 99% TRAP",
+                "right_title": "THE 1% SECRET",
+                "left_badge": "THE DEFAULT",
+                "right_badge": "THE DISCIPLINE",
+                "left_action": "SCROLL_PHONE" if is_phone else "HEADACHE_STRESS",
+                "right_action": "COUNT_MONEY" if is_money else ("MEDITATE_ZEN" if "mind" in text_lower else "TRIUMPH_FIST"),
+                "left_color": "#EF4444",
+                "right_color": "#10B981",
+                "vs_label": "VS",
+            })
+
+        elif archetype == "FULLSCREEN_INFOGRAPHIC":
+            if any(w in text_lower for w in ("iceberg", "below", "surface", "depth", "unseen")) or chosen_metaphor == "ICEBERG_DEPTH":
+                info_type = "ICEBERG_DEPTH"
+                title = "THE ICEBERG PRINCIPLE"
+                metric = "90% UNSEEN"
+                label = "YEARS OF SILENT EFFORT"
+            elif any(w in text_lower for w in ("scale", "weigh", "balance", "cost", "tradeoff", "price")):
+                info_type = "BALANCE_SCALE"
+                title = "WEIGHING THE TRADEOFF"
+                metric = "COST VS REWARD"
+                label = "SHORT-TERM PAIN = LONG-TERM FREEDOM"
+            elif any(w in text_lower for w in ("pyramid", "hierarchy", "level", "foundation")):
+                info_type = "HIERARCHY_PYRAMID"
+                title = "THE SUCCESS HIERARCHY"
+                metric = "LEVEL 3"
+                label = "FOUNDATION OF DAILY HABITS"
+            elif any(w in text_lower for w in ("percent", "1%", "rate", "dial")):
+                info_type = "RADIAL_PERCENT"
+                title = "THE 1% PRINCIPLE"
+                metric = "1%"
+                label = "DAILY IMPROVEMENT"
+            else:
+                info_type = "EXPONENTIAL_CURVE"
+                title = f"{clean_topic_upper} BREAKTHROUGH" if clean_topic_upper else "THE COMPOUND EFFECT"
+                metric = "+1,000%"
+                label = "EXPONENTIAL TRAJECTORY"
+
+            data.update({
+                "infographic_type": info_type,
+                "title": title,
+                "metric": metric,
+                "label": label,
+            })
+
+        elif archetype == "HERD_REBEL":
+            data.update({
+                "crowd_label": "THE 99% (FOLLOWING THE CROWD)",
+                "hero_label": "THE 1% (WALKING THEIR OWN PATH)",
+                "hero_action": "WALK_LEFT" if any(w in text_lower for w in ("walk", "step", "leave", "away")) else "CROSS_ARMS",
+                "spotlight": True,
+            })
+
+        elif archetype == "SCALE_CONTRAST":
+            is_time = any(w in text_lower for w in ("time", "clock", "second", "hour", "running out", "ticking", "late"))
+            data.update({
+                "colossal_type": "GIANT_CLOCK" if is_time else "GIANT_MOUNTAIN",
+                "hero_scale": 0.55,
+                "title": "TIME IS TICKING AWAY" if is_time else (f"{clean_topic_upper}" if clean_topic_upper else "THE COLOSSAL JOURNEY"),
+            })
+
+        elif archetype == "HERO_PROP_MECHANIC":
+            if any(w in text_lower for w in ("boulder", "push", "uphill", "heavy", "rock", "effort")) or chosen_metaphor == "LEVER_BOULDER":
+                mech_type = "PUSH_BOULDER"
+                title = "THE UPHILL BATTLE"
+            elif any(w in text_lower for w in ("puppet", "strings", "marionette", "control", "system")):
+                mech_type = "PUPPET_STRINGS"
+                title = "CONTROLLED BY THE STRINGS"
+            else:
+                mech_type = "HAMSTER_WHEEL"
+                title = "THE ENDLESS RAT RACE"
+
+            data.update({
+                "mechanic_type": mech_type,
+                "title": title,
+            })
+
+        elif archetype == "KINETIC_CONCEPT_CARD":
+            title = clean_topic_upper if clean_topic_upper else ("THE 1% RULE" if "1%" in text_lower else "THE CORE PRINCIPLE")
+            data.update({
+                "badge": "GOLDEN RULE" if "rule" in text_lower else "KEY PRINCIPLE",
+                "title": title,
+                "subtitle": "Daily Compounding Beats Irregular Intensity",
+                "icon": "STAR",
+            })
+
+        return data
 
