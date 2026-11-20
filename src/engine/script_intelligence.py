@@ -386,8 +386,12 @@ class ScriptIntelligenceEngine:
         effects: list[str] = []
         characters: list[dict[str, Any]] = []
 
-        # Only activate the specialized dating/texting drama scenes if the text is explicitly about romantic drama
-        has_dating_context = any(w in text_lower for w in ("texting", "dating", "romantic", "ex-boyfriend", "ex-girlfriend", "crush", "toxic relationship", "mixed signals", "unanswered calls"))
+        # Only activate the specialized dating/texting drama scenes for unambiguous romantic-drama text.
+        # shortcut: broad keywords ("texting", "dating", "romantic") removed — they appear in too many
+        # non-romance scripts and caused the procedural engine to be bypassed incorrectly.
+        has_dating_context = any(w in text_lower for w in (
+            "unanswered calls", "mixed signals", "ex-boyfriend", "ex-girlfriend", "ghosted me",
+        ))
 
         # Primary Universal Engine (Procedural + In-Process Neural Semantic Brain)
         if not has_dating_context:

@@ -124,7 +124,13 @@ class SceneComposer:
         scene = normalize_scene_for_composer(scene, style_id=self.pack.id)
         n_frames = max(1, int(round(duration * self.fps)))
         res_scale = max(0.5, min(self.width, self.height) / 540.0)
-        floor_y = int(self.height * 0.74)
+
+        # Vary floor height per scene using narration hash — 4 subtle staging variants.
+        # Gives each scene a different ground plane (low-angle, elevated, standard, wide).
+        import hashlib as _hl
+        _narr_seed = int(_hl.md5(str(scene.get("narration", "")).encode()).hexdigest()[:4], 16)
+        _floor_fracs = (0.74, 0.70, 0.76, 0.72)  # standard / elevated / low-angle / mid-wide
+        floor_y = int(self.height * _floor_fracs[_narr_seed % 4])
 
         bg_name = str(scene.get("background", self.sp.get("default_background", "ABSTRACT"))).upper()
         characters = scene.get("characters", [])

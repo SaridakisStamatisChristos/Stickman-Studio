@@ -759,7 +759,7 @@ def _score_choreographies(text: str) -> list[tuple[int, str]]:
         for kw in choreo_keywords.get(c_name, ()):
             if kw in words:
                 score += 3
-        if c_name == "question_burst" and "?" in text:
+        if c_name == "question_burst" and ("?" in text and any(w in words for w in ("why", "how", "what", "wonder", "confused", "mystery", "puzzle", "overthink"))):
             score += 2
         if score > 0:
             hit_scores.append((score, c_name))
@@ -904,6 +904,17 @@ def _pick_choreography(
             "stoic_pillar_stand", "dynamic_synthesizer",
         ],
     }
+
+    # Boost choreographies matching the detected genre profile
+    domain_heroes = set(profile_pools.get(profile, []))
+    boosted_scores = []
+    for s, c_name in hit_scores:
+        if c_name in domain_heroes:
+            s += 4
+        boosted_scores.append((s, c_name))
+    boosted_scores.sort(key=lambda item: (-item[0], item[1]))
+    scored = [c for _, c in boosted_scores]
+    best_score = boosted_scores[0][0] if boosted_scores else 0
 
     pool = list(profile_pools.get(profile, CHOREOGRAPHY_TYPES[:-1]))
     shift = (seed + idx * 7) % len(pool)

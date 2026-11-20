@@ -13,6 +13,7 @@ Coordinates:
 from __future__ import annotations
 
 import logging
+import math
 import os
 import re
 import shutil
@@ -237,21 +238,44 @@ class CISPipeline:
         # ------------------------------------------------------------------
         # 0. Script Resolution (Auto-generate or Improve if needed)
         # ------------------------------------------------------------------
+        vs = params.get("voice_settings") or {}
+        is_dial = bool(params.get("dialogue_mode", False) or vs.get("dialogue_mode", False))
+        s1 = vs.get("speaker1", {})
+        s2 = vs.get("speaker2", {})
+        spk1_name = s1.get("name", "Alex")
+        spk2_name = s2.get("name", "Maya")
+        addr_names = bool(vs.get("address_by_name", True))
+
         if not script or script_mode == "auto_generate":
             _log(log_callback, f"Auto-generating narration script for topic: '{topic}'…")
             _notify_progress(progress_callback, "Understanding script", 3)
             try:
-                from engine.scene_planner import ScenePlanner
-                sp = ScenePlanner(llm_manager=self.llm_manager)
-                script = sp.generate_script(topic=topic, duration=duration, style="cis_illustrated")
+                import random
+                gen_seed = (int(time.time() * 1000) ^ random.randint(1, 999999)) & 0x7FFFFFFF
+                from engine.inbuilt_ai_director import InbuiltAIDirector
+                script = InbuiltAIDirector.generate_script(
+                    topic=topic,
+                    duration=duration,
+                    dialogue_mode=is_dial,
+                    name1=spk1_name,
+                    name2=spk2_name,
+                    address_by_name=addr_names,
+                    style=visual_style,
+                    seed=gen_seed,
+                )
             except Exception as exc:
-                _log(log_callback, f"LLM script note: {exc}")
-                script = ""
-
-            if not script or len(script.split()) < 8:
+                _log(log_callback, f"Inbuilt AI Director note: {exc}")
                 from engine.scene_planner import ScenePlanner
                 sp = ScenePlanner(llm_manager=self.llm_manager)
-                script = sp._generate_offline_script(topic, duration=duration)
+                script = sp.generate_script(
+                    topic=topic,
+                    duration=duration,
+                    style="cis_illustrated",
+                    dialogue_mode=is_dial,
+                    name1=spk1_name,
+                    name2=spk2_name,
+                    address_by_name=addr_names,
+                )
 
             self.last_script_used = script
             _log(log_callback, f"Script ready: {len(script.split())} words.")
@@ -259,11 +283,20 @@ class CISPipeline:
             _log(log_callback, "Polishing narration script…")
             _notify_progress(progress_callback, "Understanding script", 4)
             try:
+                from engine.inbuilt_ai_director import InbuiltAIDirector
+                script = InbuiltAIDirector.improve_script(
+                    script=script,
+                    target_duration=duration,
+                    dialogue_mode=is_dial,
+                    name1=spk1_name,
+                    name2=spk2_name,
+                    address_by_name=addr_names,
+                )
+            except Exception as exc:
+                _log(log_callback, f"Script improve note: {exc}")
                 from engine.scene_planner import ScenePlanner
                 sp = ScenePlanner(llm_manager=self.llm_manager)
                 script = sp.improve_script(script=script, topic=topic, style="cis_illustrated", duration=duration)
-            except Exception as exc:
-                _log(log_callback, f"Script improve note: {exc}")
             self.last_script_used = script
 
         _notify_progress(progress_callback, "Planning scenes", 10)

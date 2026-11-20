@@ -608,7 +608,9 @@ class MainWindow(QMainWindow):
         # 2. Script
         lv.addWidget(self._make_section_header("📝 Step 2: Narration Script", color="#A78BFA"))
 
-        # Hidden radio button for script mode compatibility (defaults to clean 'use_as_is')
+        # Script mode selector & action buttons
+        _mode_row = QHBoxLayout()
+        _mode_row.setSpacing(10)
         self._mode_as_is = QRadioButton("Use my script")
         self._mode_improve = QRadioButton("Improve")
         self._mode_auto = QRadioButton("Auto-generate")
@@ -617,12 +619,46 @@ class MainWindow(QMainWindow):
         _compat_group.addButton(self._mode_as_is)
         _compat_group.addButton(self._mode_improve)
         _compat_group.addButton(self._mode_auto)
-        self._mode_as_is.hide()
-        self._mode_improve.hide()
-        self._mode_auto.hide()
-        lv.addWidget(self._mode_as_is)
-        lv.addWidget(self._mode_improve)
-        lv.addWidget(self._mode_auto)
+        for _rb in (self._mode_as_is, self._mode_improve, self._mode_auto):
+            _rb.setStyleSheet(
+                "QRadioButton { color: #94A3B8; font-size: 11px; spacing: 4px; }"
+                "QRadioButton:checked { color: #A78BFA; }"
+            )
+        _mode_row.addWidget(self._mode_as_is)
+        _mode_row.addWidget(self._mode_improve)
+        _mode_row.addWidget(self._mode_auto)
+        _mode_row.addStretch()
+
+        self._btn_gen_script = QPushButton("✨ Auto-Generate")
+        self._btn_gen_script.setObjectName("secondary")
+        self._btn_gen_script.setToolTip("Generate a fresh unique script for this topic right now")
+        self._btn_gen_script.setFixedHeight(28)
+        self._btn_gen_script.setStyleSheet(
+            "QPushButton { background: #1E1B4B; border: 1px solid #7C3AED; color: #DDD6FE; "
+            "border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 600; }"
+            "QPushButton:hover { background: #2E1065; color: #FFFFFF; border-color: #A78BFA; }"
+            "QPushButton:disabled { background: #0E131F; border-color: #243044; color: #475569; }"
+        )
+        self._btn_gen_script.clicked.connect(self._on_generate_script_clicked)
+
+        self._btn_improve_script = QPushButton("⚡ Improve")
+        self._btn_improve_script.setObjectName("secondary")
+        self._btn_improve_script.setToolTip("Polish and enhance the script in the editor right now")
+        self._btn_improve_script.setFixedHeight(28)
+        self._btn_improve_script.setStyleSheet(
+            "QPushButton { background: #082F49; border: 1px solid #0284C7; color: #BAE6FD; "
+            "border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 600; }"
+            "QPushButton:hover { background: #0C4A6E; color: #FFFFFF; border-color: #38BDF8; }"
+            "QPushButton:disabled { background: #0E131F; border-color: #243044; color: #475569; }"
+        )
+        self._btn_improve_script.clicked.connect(self._on_improve_script_clicked)
+
+        _mode_row.addWidget(self._btn_gen_script)
+        _mode_row.addWidget(self._btn_improve_script)
+        lv.addLayout(_mode_row)
+
+        self._mode_auto.clicked.connect(self._on_generate_script_clicked)
+        self._mode_improve.clicked.connect(self._on_improve_script_clicked)
 
         self._script_edit = DualVoiceScriptEditor(name1="Alex", name2="Maya")
         self._script_edit.setMinimumHeight(170)
@@ -1157,6 +1193,13 @@ class MainWindow(QMainWindow):
         s2 = vs.get("speaker2", {})
         addr = bool(vs.get("address_by_name", True))
 
+        if hasattr(self, "_btn_gen_script"):
+            self._btn_gen_script.setEnabled(False)
+            self._btn_gen_script.setText("✨ Generating…")
+
+        import time as _t, random as _r
+        gen_seed = (int(_t.time() * 1000) ^ _r.randint(1, 999999)) & 0x7FFFFFFF
+
         self._script_thread = ScriptWorkerThread(
             lambda: self.planner.generate_script(
                 topic=topic,
@@ -1166,12 +1209,16 @@ class MainWindow(QMainWindow):
                 name1=s1.get("name", "Alex"),
                 name2=s2.get("name", "Maya"),
                 address_by_name=addr,
+                seed=gen_seed,
             )
         )
         self._script_thread.finished_text.connect(self._on_script_ready_gen)
         self._script_thread.start()
 
     def _on_script_ready_gen(self, text: str) -> None:
+        if hasattr(self, "_btn_gen_script"):
+            self._btn_gen_script.setEnabled(True)
+            self._btn_gen_script.setText("✨ Auto-Generate")
         if text:
             self._script_edit.setPlainText(text)
             self._mode_as_is.setChecked(True)
@@ -1196,6 +1243,10 @@ class MainWindow(QMainWindow):
         s2 = vs.get("speaker2", {})
         addr = bool(vs.get("address_by_name", True))
 
+        if hasattr(self, "_btn_improve_script"):
+            self._btn_improve_script.setEnabled(False)
+            self._btn_improve_script.setText("⚡ Improving…")
+
         self._script_thread = ScriptWorkerThread(
             lambda: self.planner.improve_script(
                 script=script,
@@ -1212,6 +1263,9 @@ class MainWindow(QMainWindow):
         self._script_thread.start()
 
     def _on_script_ready_imp(self, text: str) -> None:
+        if hasattr(self, "_btn_improve_script"):
+            self._btn_improve_script.setEnabled(True)
+            self._btn_improve_script.setText("⚡ Improve")
         if text:
             self._script_edit.setPlainText(text)
 
@@ -1375,7 +1429,8 @@ class MainWindow(QMainWindow):
         voice_auto = bool(params.get("auto_voice_speed", False))
         # Auto speed only applies when both or user specifically enabled it, never overriding manual speed
         auto_spd = bool(cis_auto and voice_auto)
-        params = {**params, **cis_settings, "auto_voice_speed": auto_spd, "style": "cis_illustrated"}
+        params = {**params, **cis_settings, "auto_voice_speed": auto_spd, "style": "cis_illustrated",
+                  "cis_visual_style": cis_settings.get("cis_visual_style", "auto")}
 
         self._preview_player.stop()
         self._generate_btn.setEnabled(False)

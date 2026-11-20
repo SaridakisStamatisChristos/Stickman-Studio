@@ -815,9 +815,13 @@ def _choreo_question_burst(scene: dict, accent: str, out_dir: Path, prefix: str)
     draw_fitted_text(dq2, "WHY?", 65, 65, max_w=90, target_size=30, family="noto", fill=ink, bold=True)
     _save_sprite(sprites, "q_mini", im_q2, out_dir, prefix)
 
-    # 3. Lightbulb breakthrough (Beat B)
+    # 3. Lightbulb / topic breakthrough icon (Beat B)
     im_b, db = _make_sprite(240, 240)
-    draw_icon_lightbulb(db, 120, 122, accent=accent, ink=ink, card_bg=card_bg)
+    pk = str(scene.get("prop_kind", "bulb")).lower()
+    if pk in ("bulb", "lightbulb", "idea", "spark"):
+        draw_icon_lightbulb(db, 120, 122, accent=accent, ink=ink, card_bg=card_bg)
+    else:
+        draw_semantic_prop(db, pk, 120, 122, 68, accent=accent, ink=ink, card_bg=card_bg, seed=seed + 3)
     _save_sprite(sprites, "bulb", im_b, out_dir, prefix)
 
     # 4. Impact insight badge (Beat B)
@@ -1012,9 +1016,24 @@ def _choreo_spotlight_shift(scene: dict, accent: str, out_dir: Path, prefix: str
     draw_stickman_figure(dr, 160, 96, scale=1.06, pose="spotlight_crown", accent_color=accent, ink=ink, head_fill=card_bg, seed=seed + 1)
     _save_sprite(sprites, "right_fig", im_r, out_dir, prefix)
 
+    # Dynamic contrasting topic labels floating above figures
+    ltag = scene.get("left_tag") or "THE TRAP"
+    rtag = scene.get("right_tag") or "THE SHIFT"
+    im_tl, dtl = _make_sprite(340, 90)
+    hand_rect(dtl, 8, 8, 324, 74, seed=seed + 6, lw=3, color=muted, fill=card_bg, r=16, shadow=True)
+    draw_fitted_text(dtl, ltag, 170, 45, max_w=300, target_size=26, family="noto", fill=muted, bold=True)
+    _save_sprite(sprites, "tag_left", im_tl, out_dir, prefix)
+
+    im_tr, dtr = _make_sprite(340, 90)
+    hand_rect(dtr, 8, 8, 324, 74, seed=seed + 7, lw=4, color=accent, fill=soft_tint_bg(accent, 0.20, card_bg), r=16, shadow=True)
+    draw_fitted_text(dtr, rtag, 170, 45, max_w=300, target_size=28, family="noto", fill=accent, bold=True)
+    _save_sprite(sprites, "tag_right", im_tr, out_dir, prefix)
+
     sprite_plan = [
         {"sprite": "left_fig", "anim": "pop_bounce", "cx0": 320, "cy0": 1070, "w": 330, "from_f": 0.0, "to_f": 1.0},
         {"sprite": "right_fig", "anim": "pop_bounce", "cx0": 950, "cy0": 1060, "w": 345, "from_f": 0.15, "to_f": 1.0},
+        {"sprite": "tag_left", "anim": "pop_bounce", "cx0": 320, "cy0": 680, "w": 340, "from_f": 0.0, "to_f": 1.0},
+        {"sprite": "tag_right", "anim": "pop_bounce", "cx0": 950, "cy0": 680, "w": 340, "from_f": 0.25, "to_f": 1.0},
         # Cone starts illuminating Left -> slides cleanly onto Right hero!
         {"sprite": "cone", "anim": "sweep", "pts": [[320, 910], [320, 910], [950, 910], [950, 910]], "w": 490, "from_f": 0.0, "to_f": 1.0},
     ]
@@ -1052,11 +1071,18 @@ def _choreo_mirror_truth(scene: dict, accent: str, out_dir: Path, prefix: str) -
     draw_stickman_figure(dh, 160, 86, scale=1.08, pose="neutral", accent_color=accent, ink=ink, head_fill=card_bg, seed=seed + 5)
     _save_sprite(sprites, "hero", im_h, out_dir, prefix)
 
+    # Floating insight banner on mirror realization
+    im_lb, dlb = _make_sprite(520, 110)
+    hand_rect(dlb, 8, 8, 504, 94, seed=seed + 6, lw=4, color=accent, fill=card_bg, r=20, shadow=True)
+    draw_fitted_text(dlb, scene.get("beat_b_label") or "THE MIRROR NEVER LIES", 260, 55, max_w=470, target_size=28, family="caveat", fill=ink, bold=True)
+    _save_sprite(sprites, "insight_pill", im_lb, out_dir, prefix)
+
     sprite_plan = [
         {"sprite": "mirror", "anim": "pop_bounce", "cx0": 840, "cy0": 950, "w": 430, "from_f": 0.0, "to_f": 1.0},
         {"sprite": "ref_a", "anim": "crossfade", "cx0": 840, "cy0": 975, "w": 270, "a0": 0.85, "a1": 0.0, "from_f": 0.0, "to_f": 0.65},
         {"sprite": "ref_b", "anim": "crossfade", "cx0": 840, "cy0": 970, "w": 290, "a0": 0.0, "a1": 1.0, "from_f": 0.42, "to_f": 1.0},
         {"sprite": "hero", "anim": "walk_to", "cx0": 260, "cy0": 1080, "cx1": 420, "cy1": 1070, "w": 360, "from_f": 0.0, "to_f": 1.0, "hops": 2},
+        {"sprite": "insight_pill", "anim": "slide_in", "cx0": 540, "cy0": 460, "cx1": 540, "cy1": 460, "w": 520, "from_f": 0.45, "to_f": 1.0},
     ]
     vector_plan = [
         {"kind": "line", "p1": [120, 1360], "p2": [1160, 1360], "color": muted, "lw": 3, "from_f": 0.0, "to_f": 1.0},
@@ -1090,9 +1116,17 @@ def _choreo_hourglass_sprint(scene: dict, accent: str, out_dir: Path, prefix: st
     hand_line(dsp, 8, 215, 78, 215, seed=seed + 6, lw=4, color=muted)
     _save_sprite(sprites, "runner", im_sp, out_dir, prefix)
 
+    # Dynamic urgency / theme countdown badge
+    urgency_tag = scene.get("left_tag") or "TIME IS TICKING"
+    im_ub, dub = _make_sprite(420, 110)
+    hand_rect(dub, 8, 8, 404, 94, seed=seed + 7, lw=4, color=accent, fill=card_bg, r=20, shadow=True)
+    draw_fitted_text(dub, urgency_tag, 210, 55, max_w=370, target_size=28, family="caveat", fill=ink, bold=True)
+    _save_sprite(sprites, "urgency_badge", im_ub, out_dir, prefix)
+
     sprite_plan = [
         {"sprite": "hourglass", "anim": "shake_ring", "cx0": 640, "cy0": 660, "w": 330, "from_f": 0.0, "to_f": 1.0, "amp": 0.06},
         {"sprite": "runner", "anim": "walk_to", "cx0": 210, "cy0": 1165, "cx1": 980, "cy1": 1165, "w": 440, "from_f": 0.0, "to_f": 1.0, "hops": 4},
+        {"sprite": "urgency_badge", "anim": "pop_bounce", "cx0": 640, "cy0": 340, "w": 420, "from_f": 0.15, "to_f": 1.0},
     ]
     vector_plan = [
         {"kind": "line", "p1": [90, 1420], "p2": [1190, 1420], "color": accent, "lw": 5, "from_f": 0.0, "to_f": 1.0},
@@ -1431,11 +1465,18 @@ def _choreo_mind_storm_calm(scene: dict, accent: str, out_dir: Path, prefix: str
     draw_icon_sparkle(dsun, 130, 130, 56, color=accent, ink=ink)
     _save_sprite(sprites, "sun", im_sun, out_dir, prefix)
 
+    # Dynamic insight badge celebrating clarity
+    im_cb, dcb = _make_sprite(520, 110)
+    hand_rect(dcb, 8, 8, 504, 94, seed=seed + 7, lw=4, color=accent, fill=card_bg, r=20, shadow=True)
+    draw_fitted_text(dcb, scene.get("beat_b_label") or "CLARITY RESTORED", 260, 55, max_w=470, target_size=28, family="caveat", fill=ink, bold=True)
+    _save_sprite(sprites, "calm_pill", im_cb, out_dir, prefix)
+
     sprite_plan = [
         {"sprite": "storm", "anim": "crossfade", "cx0": 640, "cy0": 610, "w": 340, "from_f": 0.0, "to_f": 0.55, "a0": 1.0, "a1": 0.0},
         {"sprite": "anx", "anim": "crossfade", "cx0": 640, "cy0": 1030, "w": 330, "from_f": 0.0, "to_f": 0.52, "a0": 1.0, "a1": 0.0},
         {"sprite": "sun", "anim": "pop_bounce", "cx0": 640, "cy0": 610, "w": 270, "from_f": 0.42, "to_f": 1.0},
         {"sprite": "calm", "anim": "pop_bounce", "cx0": 640, "cy0": 1030, "w": 335, "from_f": 0.45, "to_f": 1.0},
+        {"sprite": "calm_pill", "anim": "slide_in", "cx0": 640, "cy0": 1420, "cx1": 640, "cy1": 1420, "w": 520, "from_f": 0.48, "to_f": 1.0},
     ]
     vector_plan = [
         {"kind": "ring_pulse", "cx": 640, "cy": 610, "r": 165, "color": accent, "lw": 4, "from_f": 0.45, "to_f": 1.0},
@@ -1462,7 +1503,11 @@ def _choreo_idea_spark_build(scene: dict, accent: str, out_dir: Path, prefix: st
     _save_sprite(sprites, "book", im_bk, out_dir, prefix)
 
     im_lb, dlb = _make_sprite(240, 240)
-    draw_icon_lightbulb(dlb, 120, 120, accent=accent, ink=ink, card_bg=card_bg)
+    pk = str(scene.get("prop_kind", "bulb")).lower()
+    if pk in ("bulb", "lightbulb", "spark", "none", "book"):
+        draw_icon_lightbulb(dlb, 120, 120, accent=accent, ink=ink, card_bg=card_bg)
+    else:
+        draw_semantic_prop(dlb, pk, 120, 120, 68, accent=accent, ink=ink, card_bg=card_bg, seed=seed + 5)
     _save_sprite(sprites, "bulb", im_lb, out_dir, prefix)
 
     sprite_plan = [
@@ -1494,7 +1539,10 @@ def _choreo_two_path_fork(scene: dict, accent: str, out_dir: Path, prefix: str) 
     _save_sprite(sprites, "hard", im_hd, out_dir, prefix)
 
     im_cr, dcr = _make_sprite(170, 140)
-    draw_semantic_prop(dcr, "crown", 85, 75, 58, accent=ACCENT_GOLD, ink=ink, card_bg=card_bg, seed=seed + 4)
+    reward_prop = str(scene.get("prop_kind", "crown")).lower()
+    if reward_prop in ("spark", "none", "arrow", "line"):
+        reward_prop = "crown"
+    draw_semantic_prop(dcr, reward_prop, 85, 75, 58, accent=ACCENT_GOLD, ink=ink, card_bg=card_bg, seed=seed + 4)
     _save_sprite(sprites, "crown", im_cr, out_dir, prefix)
 
     im_h, dh = _make_sprite(290, 420)
@@ -2395,6 +2443,220 @@ def _choreo_dynamic_synthesizer(scene: dict, accent: str, out_dir: Path, prefix:
     return sprites, sprite_plan, []
 
 
+# ---------------------------------------------------------------------------
+# Topic-Driven Scene Enrichment — Unique Labels & Props Per Topic+Seed
+# ---------------------------------------------------------------------------
+# Called before every choreo generator so the same choreography looks different
+# for finance / fitness / tech / psychology / science topics. Patches scene dict
+# in-place (does not mutate the storyboard outside this function).
+#
+# Domain keyword → label pools used by: left_tag, right_tag, beat_b_label,
+# question_text, prop_kind, and accent_color variant.
+# ---------------------------------------------------------------------------
+
+_TOPIC_LABEL_MAP: dict[str, dict[str, list[str]]] = {
+    "finance": {
+        "keywords": ["money", "wealth", "invest", "rich", "crypto", "bitcoin", "dollar", "finance",
+                     "business", "profit", "asset", "compound", "return", "savings", "income", "trading",
+                     "stock", "market", "budget", "spend", "salary", "equity", "debt", "cash", "roi"],
+        "left_tags":  ["POOR HABIT", "BAD DEBT", "FOMO BUY", "SPEND NOW", "ZERO SAVINGS", "HIGH COST"],
+        "right_tags": ["COMPOUND", "CASH FLOW", "INVEST", "ASSETS WIN", "ROI GROWS", "SAVE FIRST"],
+        "beat_b":     ["MONEY WORKS 24/7", "COMPOUND WINS", "ASSETS > SALARY", "INVEST EARLY",
+                       "CASH FLOW IS KING", "BUILD WEALTH"],
+        "question":   ["WHERE DOES IT GO?", "WHY STAY BROKE?", "WHAT IS WEALTH?", "HOW TO COMPOUND?"],
+        "prop_kind":  ["coin", "coin", "bull", "coin", "wealth", "coin"],
+        "accent_pool": ["#D97706", "#16A34A", "#2563EB", "#B45309", "#059669", "#1D4ED8"],
+    },
+    "tech": {
+        "keywords": ["code", "coding", "software", "developer", "python", "ai", "algorithm", "tech",
+                     "data", "machine", "neural", "cloud", "api", "app", "web", "bug", "debug",
+                     "computer", "program", "server", "database", "terminal", "deploy", "hack", "startup"],
+        "left_tags":  ["BUG ZONE", "SYNTAX ERR", "TUTORIAL HELL", "CARGO CULT", "NO SYSTEM", "COPY PASTE"],
+        "right_tags": ["SHIP IT", "CLEAN CODE", "SYSTEM BUILT", "ALGO MASTERY", "SCALE UP", "DEPLOY"],
+        "beat_b":     ["SHIP THE CODE", "BUILD SYSTEMS", "ALGO IS KING", "CLEAN ARCH WINS",
+                       "SHIP > PERFECT", "CODE COMPOUNDS"],
+        "question":   ["WHY NOT SHIP?", "WHAT IS SCALE?", "HOW TO DEBUG?", "WHY STAY STUCK?"],
+        "prop_kind":  ["code", "laptop", "code", "brain", "code", "laptop"],
+        "accent_pool": ["#7C3AED", "#0EA5E9", "#10B981", "#6366F1", "#06B6D4", "#8B5CF6"],
+    },
+    "fitness": {
+        "keywords": ["gym", "workout", "muscle", "fitness", "exercise", "lift", "diet", "protein",
+                     "bodybuilding", "cardio", "sleep", "recovery", "nutrition", "train", "body",
+                     "weight", "bulk", "cut", "strength", "run", "running", "health", "calories"],
+        "left_tags":  ["SKIP DAY", "POOR FORM", "NO SLEEP", "BAD DIET", "ZERO REPS", "GIVE UP"],
+        "right_tags": ["SHOW UP", "PROGRESSIVE", "RECOVER", "CLEAN FUEL", "MORE REPS", "PUSH IT"],
+        "beat_b":     ["SHOW UP DAILY", "REPS COMPOUND", "SLEEP BUILDS", "PROTEIN WINS",
+                       "CONSISTENCY > INTENSITY", "RESULTS COME"],
+        "question":   ["WHY NO GAINS?", "WHAT BUILDS MUSCLE?", "HOW TO RECOVER?", "WHY SKIP?"],
+        "prop_kind":  ["dumbbell", "dumbbell", "dumbbell", "battery", "dumbbell", "clock"],
+        "accent_pool": ["#E63946", "#F97316", "#DC2626", "#EA580C", "#C2410C", "#EF4444"],
+    },
+    "psychology": {
+        "keywords": ["psychology", "mind", "brain", "behavior", "overthink", "anxiety", "emotion",
+                     "dopamine", "habit", "subconscious", "trauma", "pattern", "relationship",
+                     "narcissis", "toxic", "validation", "ignore", "attract", "manipulat",
+                     "attachment", "trigger", "ego", "confidence", "fear", "social"],
+        "left_tags":  ["ANXIOUS LOOP", "EGO TRAP", "VALIDATION", "REACT MODE", "OVERTHINK", "PEOPLE PLEASE"],
+        "right_tags": ["INNER PEACE", "SELF AWARE", "BOUNDARIES", "RESPOND WISE", "CLARITY", "PROTECT PEACE"],
+        "beat_b":     ["PATTERN BROKEN", "MIND IS FREE", "PEACE RESTORED", "CLARITY WINS",
+                       "SELF MASTERY", "RESPONSE > REACT"],
+        "question":   ["WHY DO WE REPEAT?", "WHAT IS THE PATTERN?", "HOW TO BREAK FREE?", "WHY OVERTHINK?"],
+        "prop_kind":  ["brain", "mask", "brain", "key", "brain", "shield"],
+        "accent_pool": ["#8B5CF6", "#A855F7", "#6D28D9", "#7C3AED", "#9333EA", "#4F46E5"],
+    },
+    "stoicism": {
+        "keywords": ["stoic", "marcus", "aurelius", "seneca", "philosophy", "virtue", "wisdom",
+                     "discipline", "control", "calm", "resilient", "endure", "warrior", "samurai",
+                     "empire", "ancient", "rome", "greek", "fate", "meditations", "ego", "character"],
+        "left_tags":  ["EGO RULES", "PANIC MODE", "OUTER CHAOS", "REACT FAST", "SEEK COMFORT", "BLAME OTHERS"],
+        "right_tags": ["VIRTUE RULES", "STAY CALM", "INNER ORDER", "RESPOND WISE", "ENDURE", "OWN IT"],
+        "beat_b":     ["VIRTUE IS ENOUGH", "MIND IS A FORTRESS", "OBSTACLE IS THE WAY",
+                       "DISCIPLINE BUILDS", "CALM CONQUERS", "STAND FIRM"],
+        "question":   ["WHAT CAN I CONTROL?", "WHY SUFFER TWICE?", "WHAT IS VIRTUE?", "HOW TO ENDURE?"],
+        "prop_kind":  ["shield", "crown", "key", "shield", "pillar", "shield"],
+        "accent_pool": ["#78350F", "#92400E", "#713F12", "#854D0E", "#6B4423", "#7C5A2A"],
+    },
+    "science": {
+        "keywords": ["science", "space", "planet", "physics", "quantum", "universe", "atom", "galaxy",
+                     "black hole", "gravity", "biology", "dna", "rocket", "mars", "moon", "orbit",
+                     "telescope", "solar", "earth", "star", "cosmos", "evolution", "particle", "energy"],
+        "left_tags":  ["EARTH SCALE", "SLOW LIGHT", "1 PLANET", "KNOWN WORLD", "LINEAR TIME", "CLASSICAL"],
+        "right_tags": ["COSMIC SCALE", "C = CONSTANT", "BILLIONS EXIST", "MULTIVERSE", "SPACE-TIME", "QUANTUM"],
+        "beat_b":     ["REALITY IS STRANGER", "COSMOS IS VAST", "QUANTUM IS REAL",
+                       "SPACETIME BENDS", "LIFE IS RARE", "WE ARE STARDUST"],
+        "question":   ["WHAT IS OUT THERE?", "HOW BIG IS SPACE?", "WHAT IS REALITY?", "HOW DID LIFE START?"],
+        "prop_kind":  ["atom", "rocket", "brain", "atom", "rocket", "atom"],
+        "accent_pool": ["#0EA5E9", "#2563EB", "#0284C7", "#0369A1", "#075985", "#1D4ED8"],
+    },
+    "motivation": {
+        "keywords": ["motivat", "mindset", "success", "greatness", "fail", "resilience", "grit",
+                     "win", "winner", "champion", "hard work", "dream", "goal", "achieve", "believe",
+                     "courage", "never give up", "hustle", "grind", "leader", "vision", "purpose"],
+        "left_tags":  ["COMFORT ZONE", "GIVE UP", "AVERAGE LIFE", "FEAR RULES", "WAIT FOR SIGN", "SETTLE"],
+        "right_tags": ["GROWTH ZONE", "PUSH THROUGH", "ELITE LIFE", "ACTION RULES", "START NOW", "RISE"],
+        "beat_b":     ["ACTION BEATS FEAR", "DISCIPLINE > MOOD", "RESULTS SPEAK",
+                       "THE GRIND COMPOUNDS", "CHAMPIONS SHOW UP", "STANDARD RISES"],
+        "question":   ["WHAT IS STOPPING YOU?", "WHY NOT YOU?", "WHAT IS GREATNESS?", "WHY STAY AVERAGE?"],
+        "prop_kind":  ["crown", "rocket", "crown", "trophy", "crown", "lightning"],
+        "accent_pool": ["#E63946", "#DC2626", "#B91C1C", "#EF4444", "#F97316", "#D97706"],
+    },
+    "habits": {
+        "keywords": ["habit", "habits", "routine", "discipline", "focus", "productiv", "procrastin",
+                     "distraction", "morning", "pomodoro", "deep work", "study", "time", "goal",
+                     "schedule", "system", "streak", "daily", "consistent", "small steps", "atomic"],
+        "left_tags":  ["DISTRACTED", "SKIP AGAIN", "RANDOM DAYS", "MOOD WORK", "BAD LOOP", "IMPULSIVE"],
+        "right_tags": ["DEEP FOCUS", "SHOWED UP", "DAILY WINS", "SYSTEM WORK", "GOOD LOOP", "INTENTIONAL"],
+        "beat_b":     ["SYSTEM > GOALS", "1% DAILY WIN", "IDENTITY SHIFT", "ATOMIC HABITS",
+                       "STREAK BUILDS", "TINY WINS COMPOUND"],
+        "question":   ["WHY PROCRASTINATE?", "WHAT BREAKS THE LOOP?", "HOW TO BUILD STREAKS?", "WHY DISTRACT?"],
+        "prop_kind":  ["clock", "brain", "book", "clock", "battery", "book"],
+        "accent_pool": ["#059669", "#10B981", "#16A34A", "#15803D", "#166534", "#0F9B63"],
+    },
+}
+
+# Default / universal fallback for topics that don't match any domain
+_DEFAULT_LABELS: dict[str, list[str]] = {
+    "left_tags":  ["OLD WAY", "THE TRAP", "BEFORE", "COMMON MISTAKE", "THE ILLUSION", "STATUS QUO"],
+    "right_tags": ["NEW WAY", "THE TRUTH", "AFTER", "THE INSIGHT", "REALITY", "THE SHIFT"],
+    "beat_b":     ["THE SHIFT", "HERE IS THE TRUTH", "KEY INSIGHT", "THE REAL PATTERN",
+                   "THIS CHANGES EVERYTHING", "NOW YOU KNOW"],
+    "question":   ["WHAT IS THE PATTERN?", "WHY DOES THIS HAPPEN?", "WHAT IF YOU KNEW?", "HOW DO YOU ESCAPE?"],
+    "prop_kind":  ["key", "spark", "crown", "brain", "key", "lightning"],
+    "accent_pool": ["#E63946", "#1D70B8", "#D97706", "#2A9D8F", "#7C3AED", "#059669"],
+}
+
+
+def _detect_topic_domain(narration: str, topic: str) -> str:
+    """Fast keyword scan — returns the best-matching domain key or 'default'."""
+    combined = (narration + " " + topic).lower()
+    best_domain, best_score = "default", 0
+    for domain, cfg in _TOPIC_LABEL_MAP.items():
+        score = sum(1 for kw in cfg["keywords"] if kw in combined)
+        if score > best_score:
+            best_domain, best_score = domain, score
+    return best_domain
+
+
+def _enrich_scene_for_topic(scene: dict) -> dict:
+    """
+    Inject topic-specific labels, prop kind, and accent color variant into the
+    scene dict BEFORE the choreo generator runs. This makes the same choreography
+    look completely different for a finance video vs. a fitness video vs. a
+    psychology video — unique visuals driven by actual script content.
+
+    Uses variant_seed to pick different labels within each domain on each run,
+    so even two finance scripts get different left/right label pairs.
+
+    Returns a patched copy (never mutates the original storyboard dict).
+    """
+    import re as _re
+    sc = dict(scene)  # shallow copy — do not mutate caller's dict
+
+    narration = str(sc.get("narration", ""))
+    topic     = str(sc.get("topic", ""))
+    seed      = int(sc.get("variant_seed", 42))
+    choreo    = str(sc.get("choreography", sc.get("composition_type", "")))
+
+    domain = _detect_topic_domain(narration, topic)
+    cfg    = _TOPIC_LABEL_MAP.get(domain, {})
+    defs   = _DEFAULT_LABELS
+
+    def _pick(pool: list[str], offset: int = 0) -> str:
+        return pool[(seed + offset) % len(pool)] if pool else ""
+
+    # 1. Left / right contrast labels (used by: scale_tipping, give_and_withdraw,
+    #    bridge_cross, two_path_fork, split_cards_slide, staircase_climb steps,
+    #    hourglass_sprint timer label, etc.)
+    if not sc.get("left_tag"):
+        sc["left_tag"]  = _pick(cfg.get("left_tags",  defs["left_tags"]),  0)
+    if not sc.get("right_tag"):
+        sc["right_tag"] = _pick(cfg.get("right_tags", defs["right_tags"]), 3)
+
+    # 2. Beat B insight badge (question_burst bulb label, idea_spark banner, etc.)
+    if not sc.get("beat_b_label"):
+        sc["beat_b_label"] = _pick(cfg.get("beat_b", defs["beat_b"]), 1)
+
+    # 3. Question text (question_burst big "?" label)
+    if not sc.get("question_text"):
+        sc["question_text"] = _pick(cfg.get("question", defs["question"]), 2)
+
+    # 4. Prop kind — drives draw_semantic_prop() and ProceduralObjectEngine injection
+    if not sc.get("prop_kind") or sc.get("prop_kind") == "spark":
+        sc["prop_kind"] = _pick(cfg.get("prop_kind", defs["prop_kind"]), 0)
+
+    # 5. Accent color variant — different palette per domain+seed so colors differ
+    #    even for the same domain across scenes. Only override if accent not set.
+    if not sc.get("accent_color"):
+        pool = cfg.get("accent_pool", defs["accent_pool"])
+        sc["accent_color"] = pool[(seed // 97 + int(sc.get("scene_id", 1))) % len(pool)]
+
+    # 6. Topic-extracted step labels for staircase_climb and domino_ripple
+    if choreo in ("staircase_climb", "domino_ripple") and not sc.get("steps"):
+        words = _re.findall(r"[A-Za-z][a-zA-Z]{3,}", narration + " " + topic)
+        seen: set[str] = set()
+        kws: list[str] = []
+        _skip = {"that", "this", "with", "from", "have", "been", "will",
+                 "your", "their", "when", "what", "into", "just", "about"}
+        for w in words:
+            lw = w.lower()
+            if lw not in _skip and lw not in seen:
+                seen.add(lw)
+                kws.append(w.upper()[:8])
+                if len(kws) >= 3:
+                    break
+        if len(kws) >= 2:
+            sc["steps"] = kws[:3] if len(kws) >= 3 else kws + [_pick(cfg.get("right_tags", defs["right_tags"]), 5)]
+
+    # 7. Insight pill headline (used by spotlight_shift, mind_storm_calm, etc.)
+    if not sc.get("insight_text") and not sc.get("beat_b_label"):
+        sc["insight_text"] = sc.get("beat_b_label", _pick(cfg.get("beat_b", defs["beat_b"]), 7))
+
+    sc["left_label"] = sc.get("left_label") or sc["left_tag"]
+    sc["right_label"] = sc.get("right_label") or sc["right_tag"]
+
+    return sc
+
+
 _CHOREO_GENERATORS = {
     "question_burst": _choreo_question_burst,
     "phone_trap": _choreo_phone_trap,
@@ -2686,6 +2948,7 @@ class CISSceneIllustrator:
         return comp
 
     def illustrate(self, scene: dict, output_path: str) -> bool:
+        scene.update(_enrich_scene_for_topic(scene))
         out_p = Path(output_path)
         out_p.parent.mkdir(parents=True, exist_ok=True)
         stem = out_p.stem

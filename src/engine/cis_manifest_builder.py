@@ -114,11 +114,17 @@ def _build_captions(
             t_cursor = c_end
             last_end = c_end
 
-    for i in range(1, len(captions)):
+    i = 1
+    while i < len(captions):
         if captions[i]["start"] < captions[i - 1]["end"]:
             captions[i]["start"] = captions[i - 1]["end"]
         if captions[i]["end"] <= captions[i]["start"]:
-            captions[i]["end"] = min(max_safe_end, round(captions[i]["start"] + 0.1, 3))
+            new_end = round(min(max_safe_end, captions[i]["start"] + 0.05), 3)
+            if new_end <= captions[i]["start"]:
+                captions.pop(i)  # zero-length at max_safe_end — drop it
+                continue
+            captions[i]["end"] = new_end
+        i += 1
 
     if captions:
         captions[-1]["end"] = min(captions[-1]["end"], max_safe_end)

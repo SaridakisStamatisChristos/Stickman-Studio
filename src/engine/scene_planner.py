@@ -350,10 +350,15 @@ class ScenePlanner:
         name1: str = "Alex",
         name2: str = "Maya",
         address_by_name: bool = True,
+        seed: int = 0,
     ) -> str:
         """Generate a duration-paced, style-toned narration script from *topic*."""
         pack, _sp = resolve_style_pack(style)
         clean_topic = (topic or "human behavior").strip()
+
+        if seed == 0:
+            import time as _time, random as _random
+            seed = (int(_time.time() * 1000) ^ _random.randint(1, 999999)) & 0x7FFFFFFF
 
         # If dialogue mode requested, route directly to high-speed Inbuilt AI Director
         if dialogue_mode:
@@ -367,6 +372,7 @@ class ScenePlanner:
                     name2=name2,
                     address_by_name=address_by_name,
                     style=style,
+                    seed=seed,
                 )
             except Exception as exc:
                 logger.warning("InbuiltAIDirector dialogue generation error: %s", exc)
@@ -402,6 +408,7 @@ class ScenePlanner:
                 duration=duration,
                 dialogue_mode=False,
                 style=style,
+                seed=seed,
             )
         except Exception:
             return self._generate_offline_script(clean_topic, duration=duration, pack=pack)
