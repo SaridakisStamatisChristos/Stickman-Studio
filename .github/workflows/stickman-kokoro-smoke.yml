@@ -1,0 +1,44 @@
+name: Stickman Kokoro narrated video smoke
+
+on:
+  push:
+    branches:
+      - test/cpu-e2e-smoke
+    paths:
+      - tools/ci_kokoro_render.py
+      - .github/workflows/stickman-kokoro-smoke.yml
+      - src/tts/**
+      - src/engine/cis_pipeline.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kokoro-cpu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Kokoro and local FFmpeg
+        run: |
+          python -m pip install Pillow numpy requests soundfile imageio-ffmpeg 'kokoro-onnx>=0.3' 'onnxruntime>=1.16'
+          mkdir -p .ci-bin
+          python -c "from pathlib import Path; import imageio_ffmpeg; Path('.ci-bin/ffmpeg').symlink_to(imageio_ffmpeg.get_ffmpeg_exe())"
+          echo "$PWD/.ci-bin" >> "$GITHUB_PATH"
+      - name: Test neural Kokoro voice and complete narrated video
+        run: python tools/ci_kokoro_render.py
+      - name: Archive WAV, MP4 and diagnostic report (exclude model weights)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stickman-kokoro-voice-smoke
+          path: |
+            voice-output/kokoro_proof.wav
+            voice-output/report.json
+            voice-output/jobs/**/output_film.mp4
+          retention-days: 7
+          if-no-files-found: warn
