@@ -1,0 +1,39 @@
+name: Stickman CPU end-to-end smoke
+
+on:
+  push:
+    branches:
+      - test/cpu-e2e-smoke
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install CPU smoke dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install Pillow numpy requests soundfile
+          ffmpeg -version | head -n 1
+      - name: Test topic-to-storyboard and illustrator (3 domains)
+        run: python -m unittest discover -s tests -p 'test_smoke_cpu.py' -v
+      - name: End-to-end CPU topic-to-silent-MP4 smoke
+        run: python tools/ci_cpu_render.py
+      - name: Archive video, storyboard assets and diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stickman-cpu-smoke
+          path: smoke-output/
+          retention-days: 7
+          if-no-files-found: warn
