@@ -817,13 +817,13 @@ class CISPipeline:
                     for sc in storyboard
                 ]
 
-        # Check NVENC GPU support
-        use_nvenc = False
-        try:
-            chk = subprocess.run([ffmpeg_bin, "-hide_banner", "-encoders"], capture_output=True, text=True, timeout=5)
-            use_nvenc = "h264_nvenc" in chk.stdout
-        except Exception:
-            pass
+        # NVENC being compiled into FFmpeg does not imply a functioning NVIDIA GPU.
+        # Probe an actual encode before selecting hardware acceleration; CPU-only
+        # systems and CI runners must reliably fall back to libx264.
+        from video.encoder import VideoEncoder
+        use_nvenc = VideoEncoder(
+            ffmpeg_path=ffmpeg_bin, use_hardware=True
+        ).check_nvenc_support()
 
         vcodec = "h264_nvenc" if use_nvenc else "libx264"
         cmd = [
