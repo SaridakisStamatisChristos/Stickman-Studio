@@ -1,5 +1,6 @@
 from pathlib import Path
-import subprocess, tempfile
+import os, json
+from kokoro_onnx import Kokoro
 import numpy as np
 from scipy.io import wavfile
 from scipy.signal import resample_poly, butter, sosfilt
@@ -21,10 +22,46 @@ x=np.arange(int(1.15*R))/R;put((np.sin(2*np.pi*(85*x-20*x*x))+.35*rng.normal(siz
 for i,f in enumerate([523.25,659.25,783.99,1046.5,1318.51,1567.98]):put(tone(f,1.35,3.5),5.2+i*.095,.09)
 for i in range(14):put(tone(700+int(rng.integers(0,1100)),.25,13),5.45+i*.24,.024)
 for i,f in enumerate([523.25,659.25,783.99]):put(tone(f,.9,4),9.2+i*.09,.065)
-phrases=[(0.22,'A little robot found a chest.'),(2.7,'But inside, something shone.'),(5.42,'Two hundred fifty thousand stars.'),(8.98,'No AI video. Just code.')]
-with tempfile.TemporaryDirectory() as tmp:
- for k,(st,s) in enumerate(phrases):
-  p=Path(tmp)/f'{k}.wav'; subprocess.run(['espeak','-v','en-us','-s','170','-p','43','-w',str(p),s],check=True); sr,v=wavfile.read(p);g=gcd(sr,R);v=resample_poly(v.astype(float)/32768,R//g,sr//g);v=np.trim_zeros(v,'fb');v=sosfilt(butter(2,110,btype='highpass',fs=R,output='sos'),v);v=v/(np.max(np.abs(v))+1e-8);put(v,st,.49)
+phrases=[(0.22,2.64,'A little robot found a chest.'),(2.7,5.30,'But inside, something shone.'),(5.42,8.90,'Two hundred fifty thousand stars.'),(8.98,11.80,'No AI video. Just code.')]
+model_dir=Path(os.environ.get('KOKORO_MODEL_DIR',Path(__file__).resolve().parent.parent/'models'/'kokoro'))
+voice=os.environ.get('KOKORO_VOICE','af_heart')
+kokoro=Kokoro(str(model_dir/'kokoro-v1.0.int8.onnx'),str(model_dir/'voices-v1.0.bin'))
+narration=np.zeros(N)
+report={'backend':'kokoro-onnx','voice':voice,'sample_rate':R,'segments':[]}
+for st,end,s in phrases:
+ speed=1.0
+ for attempt in range(5):
+  v,sr=kokoro.create(s,voice=voice,speed=speed,lang='en-us')
+  v=np.asarray(v,dtype=float).reshape(-1)
+  assert len(v)>0 and np.isfinite(v).all()
+  nz=np.flatnonzero(np.abs(v)>.002)
+  assert len(nz)>0,'silent Kokoro output'
+  v=v[max(0,nz[0]-int(.025*sr)):min(len(v),nz[-1]+int(.08*sr)+1)]
+  if len(v)/sr<=end-st: break
+  speed*=max(1.06,(len(v)/sr)/(end-st)*1.04)
+ else: raise RuntimeError(f'Narration does not fit: {s}')
+ g=gcd(sr,R);v=resample_poly(v,R//g,sr//g)
+ v=sosfilt(butter(2,90,btype='highpass',fs=R,output='sos'),v)
+ rms=float(np.sqrt(np.mean(v*v)))
+ assert rms>.001
+ v*=min(.17/rms,.66/(np.max(np.abs(v))+1e-8))
+ ramp=min(int(.012*R),len(v)//2)
+ if ramp:
+  v[:ramp]*=np.linspace(0,1,ramp);v[-ramp:]*=np.linspace(1,0,ramp)
+ i=int(st*R);j=i+len(v)
+ assert j<=int(end*R)+1 and j<=N
+ narration[i:j]+=v
+ # Smooth music ducking around each utterance.
+ left=max(0,i-int(.09*R));right=min(N,j+int(.18*R))
+ mix[left:i]*=np.linspace(1,.46,i-left)
+ mix[i:j]*=.46
+ mix[j:right]*=np.linspace(.46,1,right-j)
+ report['segments'].append({'text':s,'start':st,'end':j/R,'speed':speed,'rms':rms})
+mix+=narration
+out_dir=Path(__file__).resolve().parent.parent/'out';out_dir.mkdir(exist_ok=True)
+wavfile.write(out_dir/'kokoro-narration.wav',R,np.int16(np.clip(narration,-1,1)*32767))
+(out_dir/'voice-report.json').write_text(json.dumps(report,indent=2))
+print(json.dumps(report,indent=2),flush=True)
 fade=np.minimum(t/.04,1)*np.minimum((12-t)/.22,1); mix=np.tanh(mix*1.15)*fade
 out=Path(__file__).resolve().parent.parent/'public'/'soundtrack.wav'
 out.parent.mkdir(exist_ok=True)

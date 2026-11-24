@@ -1,4 +1,4 @@
-name: Robot Treasure - native Remotion
+name: Robot Treasure - Remotion + Kokoro
 on:
   push:
     branches: [experiment/robot-treasure-remotion-v1]
@@ -19,21 +19,36 @@ jobs:
           node-version: '22'
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.11'
       - run: npm install --no-audit --no-fund
-      - run: |
+      - name: Cache Kokoro model files
+        uses: actions/cache@v4
+        with:
+          path: experiments/remotion-smoke/models/kokoro
+          key: kokoro-onnx-v1-int8-voices-v1
+      - name: Install and synthesize local Kokoro narration
+        run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq espeak ffmpeg
-          python -m pip install numpy==2.2.6 scipy==1.15.3
+          sudo apt-get install -y -qq espeak-ng ffmpeg
+          python -m pip install numpy scipy 'kokoro-onnx>=0.3' 'onnxruntime>=1.16' soundfile
+          mkdir -p models/kokoro
+          cd models/kokoro
+          for file in kokoro-v1.0.int8.onnx voices-v1.0.bin; do
+            if [ ! -s "$file" ]; then
+              curl -fL --retry 3 "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$file" -o "$file.tmp"
+              mv "$file.tmp" "$file"
+            fi
+          done
+          cd ../..
           python scripts/make_robot_audio.py
       - name: Render native Remotion composition
         run: |
           mkdir -p out
-          npx remotion render src/robot.jsx RobotTreasure out/robot-treasure.mp4 --codec h264 --concurrency 2
+          npx remotion render src/robot.jsx RobotTreasure out/robot-treasure-kokoro.mp4 --codec h264 --concurrency 2
       - name: Validate MP4
         run: |
-          ffprobe -v error -show_streams -show_format -of json out/robot-treasure.mp4 > out/probe.json
-          ffmpeg -v error -xerror -i out/robot-treasure.mp4 -f null -
+          ffprobe -v error -show_streams -show_format -of json out/robot-treasure-kokoro.mp4 > out/probe.json
+          ffmpeg -v error -xerror -i out/robot-treasure-kokoro.mp4 -f null -
           python - <<'PY'
           import json
           from pathlib import Path
@@ -49,6 +64,6 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: robot-treasure-remotion
+          name: robot-treasure-kokoro
           path: experiments/remotion-smoke/out/
           retention-days: 30

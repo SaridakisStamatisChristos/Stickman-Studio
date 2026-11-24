@@ -1,5 +1,5 @@
-# Robot Treasure
+# Robot Treasure — Kokoro narration
 
-Run `npm install`, generate the soundtrack with `python scripts/make_robot_audio.py` (requires espeak, numpy and scipy), and run `npx remotion render src/robot.jsx RobotTreasure out/robot-treasure.mp4 --codec h264 --concurrency 2`.
+Same 360-frame Remotion composition; only the audio pipeline changes. Default neural voice: af_heart. The script synthesizes locally using Kokoro ONNX INT8, fits each phrase to its scene without truncation, resamples to 48 kHz, ducks music under speech, and writes an isolated narration WAV plus timing report. No eSpeak voice fallback. eSpeak NG is only a phonemization dependency.
 
-12 seconds, 1080x1920, 30 fps. All geometry, typography, animation, music, and SFX are procedural; narration uses local eSpeak. The workflow checks the frame count, codecs, dimensions, duration and full decode. Native Remotion result is pending until CI passes.
+Run the workflow for initial model acquisition and render, or install dependencies and model files locally using the workflow instructions. Model files are not committed.
