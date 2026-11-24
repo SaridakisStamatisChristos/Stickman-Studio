@@ -1,0 +1,56 @@
+name: Creative Duel — Remotion native director cut
+on:
+  push:
+    branches: [experiment/creative-duel-remotion-v1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: experiments/remotion-smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Remotion
+        run: npm install --no-audit --no-fund
+      - name: Generate common 15-second soundtrack
+        run: python3 scripts/make_creative_audio.py
+      - name: Render original character-driven cut
+        run: |
+          mkdir -p out
+          echo "RENDER_START=$(date +%s%3N)" >> "$GITHUB_ENV"
+          npx remotion render src/creative.tsx CreativeDuel out/creative-remotion.mp4 --codec h264 --concurrency 2
+          echo "RENDER_END=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - name: Verify full video and audio
+        run: |
+          if ! command -v ffprobe >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; fi
+          ffprobe -v error -show_streams -show_format -of json out/creative-remotion.mp4 > out/probe.json
+          ffmpeg -v error -xerror -i out/creative-remotion.mp4 -f null -
+          python3 - <<'PY'
+          import json,os,pathlib
+          d=json.loads(pathlib.Path('out/probe.json').read_text())
+          vs=[x for x in d['streams'] if x['codec_type']=='video']
+          aud=[x for x in d['streams'] if x['codec_type']=='audio']
+          assert len(vs)==1 and len(aud)==1, d
+          v=vs[0];assert (v['width'],v['height'])==(1280,720)
+          assert v['codec_name']=='h264' and aud[0]['codec_name']=='aac'
+          assert v['r_frame_rate']=='24/1' and int(v.get('nb_frames','360'))==360
+          dur=float(d['format']['duration']);assert 14.98<=dur<=15.05,dur
+          p=pathlib.Path('out/creative-remotion.mp4')
+          result={'engine':'remotion','treatment':'character-led tracking shot','duration_seconds':dur,'render_seconds':(int(os.environ['RENDER_END'])-int(os.environ['RENDER_START']))/1000,'bytes':p.stat().st_size,'fps':24,'frame_count':360,'dimensions':'1280x720','audio':'AAC','full_decode':True,'scene':'The Last Signal'}
+          pathlib.Path('out/metrics.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result,indent=2))
+          PY
+      - name: Publish independently validated MP4
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creative-duel-remotion
+          retention-days: 30
+          path: experiments/remotion-smoke/out/**
