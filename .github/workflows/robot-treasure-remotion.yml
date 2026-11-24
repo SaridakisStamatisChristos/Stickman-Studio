@@ -1,0 +1,54 @@
+name: Robot Treasure - native Remotion
+on:
+  push:
+    branches: [experiment/robot-treasure-remotion-v1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: experiments/remotion-smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm install --no-audit --no-fund
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq espeak ffmpeg
+          python -m pip install numpy==2.2.6 scipy==1.15.3
+          python scripts/make_robot_audio.py
+      - name: Render native Remotion composition
+        run: |
+          mkdir -p out
+          npx remotion render src/robot.jsx RobotTreasure out/robot-treasure.mp4 --codec h264 --concurrency 2
+      - name: Validate MP4
+        run: |
+          ffprobe -v error -show_streams -show_format -of json out/robot-treasure.mp4 > out/probe.json
+          ffmpeg -v error -xerror -i out/robot-treasure.mp4 -f null -
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('out/probe.json').read_text())
+          v=[s for s in d['streams'] if s['codec_type']=='video']
+          a=[s for s in d['streams'] if s['codec_type']=='audio']
+          assert len(v)==len(a)==1
+          assert (v[0]['width'],v[0]['height'])==(1080,1920)
+          assert v[0]['codec_name']=='h264' and a[0]['codec_name']=='aac'
+          assert v[0]['r_frame_rate']=='30/1' and int(v[0]['nb_frames'])==360
+          assert abs(float(d['format']['duration'])-12)<0.08
+          print('Native Remotion: 360 frames, 1080x1920, 30 fps, H264/AAC, full decode passed')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: robot-treasure-remotion
+          path: experiments/remotion-smoke/out/
+          retention-days: 30
