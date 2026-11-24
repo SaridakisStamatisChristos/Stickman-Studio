@@ -31,6 +31,7 @@ jobs:
           echo "end=$(date +%s)" >> "$GITHUB_ENV"
       - name: Validate MP4 and measure
         run: |
+          if ! command -v ffprobe >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; fi
           ffprobe -v error -show_format -show_streams -of json out/remotion-smoke.mp4 > out/ffprobe.json
           python3 - <<'PY'
           import json, os, pathlib
