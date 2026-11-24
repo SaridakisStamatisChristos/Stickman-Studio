@@ -1,0 +1,56 @@
+name: Remotion smoke render
+on:
+  push:
+    branches: [experiment/remotion-smoke-v1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: experiments/remotion-smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact Remotion packages
+        run: npm install --no-audit --no-fund
+      - name: Generate soundtrack
+        run: python3 scripts/make_audio.py
+      - name: Check compositions
+        run: npm run compositions
+      - name: Render MP4
+        run: |
+          mkdir -p out
+          echo "start=$(date +%s)" >> "$GITHUB_ENV"
+          npm run render
+          echo "end=$(date +%s)" >> "$GITHUB_ENV"
+      - name: Validate MP4 and measure
+        run: |
+          ffprobe -v error -show_format -show_streams -of json out/remotion-smoke.mp4 > out/ffprobe.json
+          python3 - <<'PY'
+          import json, os, pathlib
+          p = pathlib.Path('out/remotion-smoke.mp4')
+          d = json.loads(pathlib.Path('out/ffprobe.json').read_text())
+          video = [s for s in d['streams'] if s['codec_type'] == 'video']
+          audio = [s for s in d['streams'] if s['codec_type'] == 'audio']
+          duration = float(d['format']['duration'])
+          assert len(video) == 1, 'missing or multiple video streams'
+          assert video[0]['width'] == 1280 and video[0]['height'] == 720
+          assert len(audio) >= 1, 'missing audio'
+          assert 9.9 <= duration <= 10.1, duration
+          report = {'ok': True, 'duration_seconds': duration, 'resolution': '1280x720', 'fps': video[0]['r_frame_rate'], 'video_codec': video[0]['codec_name'], 'audio_codec': audio[0]['codec_name'], 'bytes': p.stat().st_size, 'wall_seconds': int(os.environ['end'])-int(os.environ['start'])}
+          pathlib.Path('out/metrics.json').write_text(json.dumps(report, indent=2))
+          print(json.dumps(report, indent=2))
+          PY
+      - name: Upload MP4 and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remotion-smoke-video
+          path: experiments/remotion-smoke/out/*
+          if-no-files-found: warn

@@ -1,0 +1,21 @@
+{
+  "name": "stickman-remotion-smoke",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "render": "remotion render src/index.tsx StickmanSmoke out/remotion-smoke.mp4 --codec h264 --concurrency 2",
+    "compositions": "remotion compositions src/index.tsx"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.546",
+    "@remotion/media": "4.0.546",
+    "remotion": "4.0.546",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3"
+  }
+}
